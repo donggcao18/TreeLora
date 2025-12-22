@@ -132,11 +132,13 @@ def parse_args():
         required=True
     )
     
-    parser.add_argument(
-        "--master_port",
-        type=int,
-        required=True
-    )
+    # parser.add_argument(
+    #     "--master_port",
+    #     type=int,
+    #     required=True
+    # )
+
+
     # parser = deepspeed.add_config_arguments(parser)
     args = parser.parse_args()
     
@@ -302,7 +304,7 @@ def run_inference(current_rank, args):
     command = [
         "deepspeed",
         f"--include=localhost:{current_gpu}",
-        f"--master_port {args.master_port + current_rank}",
+        # f"--master_port {args.master_port + current_rank}",
         "inference/infer_part.py",
         "--deepspeed"
     ]

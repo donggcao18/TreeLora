@@ -3,12 +3,12 @@
 #get current time:
 now=$(date +"%m%d_%H%M%S")
 #get GPUs:
-gpu_nodes="0,1,2,3"
+gpu_nodes="0"
 
+# model_name="Llama-3.2-1B-Instruct"
 #model_name="Llama-2-7b-chat"
 #model_name="Llama-3.1-8B-Instruct"
-#model_name="Llama-3.2-1B-Instruct"
-#model_name="Qwen2.5-7B-Instruct"
+model_name="Qwen2.5-7B-Instruct"
 #model_name="Mistral-7B-Instruct-v0.3"
 #model_name="gemma-2b-it"
 
@@ -20,7 +20,7 @@ reg=0.5
 
 # Train:
 echo "Start training..."
-deepspeed --include=localhost:$gpu_nodes --master_port 25011 training/main.py  \
+deepspeed --include=localhost:$gpu_nodes  training/main.py  \
     --data_path ./data/LLM-CL-Benchmark/LLM-CL-Benchmark_500 \
     --dataset_name C-STANCE,FOMC,MeetingBank,Py150,ScienceQA,NumGLUE-cm,NumGLUE-ds,20Minuten \
     --model_name_or_path ./PTM/$model_name \
@@ -46,8 +46,7 @@ deepspeed --include=localhost:$gpu_nodes --master_port 25011 training/main.py  \
 # Inference:
 echo "Start inference..."
 python inference/infer_multi_command.py  \
-    --gpus $gpu_nodes \
-    --master_port 25011 \
+    --gpus=$gpu_nodes \
     --data_path ./data/LLM-CL-Benchmark/LLM-CL-Benchmark_500 \
     --inference_tasks C-STANCE,FOMC,MeetingBank,Py150,ScienceQA,NumGLUE-cm,NumGLUE-ds,20Minuten \
     --model_name_or_path ./PTM/$model_name \

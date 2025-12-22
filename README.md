@@ -44,6 +44,7 @@ torchvision==0.19.1
 ```bash
 # Install dependencies
 pip install -r requirements.txt
+pip install flash-attn==2.6.3 --no-build-isolation
 ```
 
 ### 2. Data and Model Preparation
@@ -67,13 +68,21 @@ pip install -r requirements.txt
         git clone https://huggingface.co/meta-llama/Llama-3.2-1B-Instruct
         ```
 
+-   3. Unzip data
+        ```bash
+        cd TreeLora/data/LLM-CL-Benchmark
+        tar -xf LLM-CL-Benchmark_500.tar.xz
+        ```
 ### 3. Training and Evaluating
 
 To train and evaluate a method on the TRACE dataset, just run:
 
 ```bash
+export CUDA_VISIBLE_DEVICES=0
 export model_name="Llama-3.2-1B-Instruct"
 
+apt-get update && apt-get install -y git-lfs
+cd /root/workspace/TreeLora/PTM && git lfs install && cd Llama-3.2-1B-Instruct && git lfs pull
 # Run training script with default parameters (e.g., TreeLoRA)
 bash scripts/lora_based_methods/Tree_LoRA.sh
 ```

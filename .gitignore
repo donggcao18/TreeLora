@@ -161,3 +161,10 @@ cython_debug/
 #.idea/
 try.py
 /.run/
+
+
+data/
+*.json
+tmp/
+PTM/
+outputs_LLM-CL/

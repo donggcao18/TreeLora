@@ -1,10 +1,9 @@
-accelerate==1.0.1
-bitsandbytes==0.46.1
-deepspeed==0.15.3+cu124torch2.4
 torch==2.4.1
 torchvision==0.19.1
+accelerate==1.0.1
+bitsandbytes==0.46.1
+deepspeed==0.15.3
 einops==0.8.0
-flash_attn==2.6.3
 fuzzywuzzy==0.18.0
 huggingface_hub==0.25.2
 nltk==3.9.1
@@ -25,3 +24,5 @@ transformers==4.45.2
 triton==3.0.0
 vision_transformer==1.0.0
 datasets==2.18.0
+rouge
+numpy
