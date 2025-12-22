@@ -633,7 +633,13 @@ def main():
     # Initialize the global progress bar
 
     if args.CL_method in Method2Class.keys():
-        CL_Trainer = Method2Class[args.CL_method](model, tokenizer, optimizer, train_task_list, eval_task_list, test_task_list, args)
+        CL_Trainer = Method2Class[args.CL_method](model, 
+                                                  tokenizer,
+                                                    optimizer, 
+                                                    train_task_list, 
+                                                    eval_task_list, 
+                                                    test_task_list, 
+                                                    args)
         CL_Trainer.train_continual()
 
 if __name__ == "__main__":

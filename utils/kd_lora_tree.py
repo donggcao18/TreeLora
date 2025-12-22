@@ -204,7 +204,8 @@ class KD_LoRA_Tree:
             # Initialize similarity tensor if not exists
             if self.sim is None:
                 self.sim = torch.zeros((task_id, self.all_grad.shape[1]), device=device)
-                self.num_of_selected = torch.zeros(self.args.num_tasks, self.all_grad.shape[1]).to(device, non_blocking=True)
+                self.num_of_selected = torch.zeros(self.args.num_tasks, 
+                                                   self.all_grad.shape[1]).to(device, non_blocking=True)
 
         if cosine_sim:
             # We don't calculate all similarities here anymore
@@ -264,7 +265,7 @@ class KD_LoRA_Tree:
     def get_loss(self, _grad_current, loss, task_id, prev_id_matrix):
         reg_loss = tree_lora_loss(_grad_current, self.all_grad_device, task_id, prev_id_matrix)
         
-        # accelerate:
+        # accelerate: for the ecerleeration andd for the most ;part in this case we can do the same thing 
         reg_loss = reg_loss / (reg_loss.detach().clone() + 1e-5) * loss.detach().clone() * self.tmp_reg
         # reg_loss = reg_loss / -20000
         
