@@ -163,7 +163,7 @@ try.py
 /.run/
 
 
-data/
+data/LLM-CL-Benchmark/
 *.json
 tmp/
 PTM/
