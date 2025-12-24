@@ -33,7 +33,7 @@ def convert_to_codetask(split_name="train"):
         os.makedirs(save_dir, exist_ok=True)
         dataset = load_dataset(HUGGINGFACE_DATASET[task], split=split_name)
         
-        output_data = {}
+        output_data = []
 
         for i, example in enumerate(tqdm(dataset, desc=f"Processing {split_name}")):
             input_text = DEFINITION[task] + example[TEXT_KEYS[task]]

@@ -66,6 +66,8 @@ pip install flash-attn==2.6.3 --no-build-isolation
         ```bash
         cd ./PTM
         git clone https://huggingface.co/meta-llama/Llama-3.2-1B-Instruct
+        apt-get update && apt-get install -y git-lfs
+        cd Llama-3.2-1B-Instruct && git lfs pull
         ```
 
 -   3. Unzip data

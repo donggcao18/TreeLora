@@ -24,8 +24,8 @@ deepspeed --include=localhost:$gpu_nodes  training/main.py  \
     --data_path ./data/LLM-CL-Benchmark/LLM-CL-Benchmark_500 \
     --dataset_name C-STANCE,FOMC,MeetingBank,Py150,ScienceQA,NumGLUE-cm,NumGLUE-ds,20Minuten \
     --model_name_or_path ./PTM/$model_name \
-    --per_device_train_batch_size 1 \
-    --per_device_eval_batch_size 1 \
+    --per_device_train_batch_size 8 \
+    --per_device_eval_batch_size 4 \
     --max_prompt_len 1024 \
     --max_ans_len 512 \
     --learning_rate 1e-4 \
