@@ -81,10 +81,10 @@ To train and evaluate a method on the TRACE dataset, just run:
 
 ```bash
 export CUDA_VISIBLE_DEVICES=0
-export model_name="Llama-3.2-1B-Instruct"
+export model_name="Qwen2.5-1.5B-Instruct"
 
 apt-get update && apt-get install -y git-lfs
-cd /root/workspace/TreeLora/PTM && git lfs install && cd Llama-3.2-1B-Instruct && git lfs pull
+cd /root/workspace/TreeLora/PTM && git lfs install && cd Qwen2.5-1.5B-Instruct && git lfs pull
 # Run training script with default parameters (e.g., TreeLoRA)
 bash scripts/lora_based_methods/Tree_LoRA.sh
 ```

@@ -43,21 +43,21 @@ deepspeed --include=localhost:$gpu_nodes training/main.py  \
     --reg $reg
 
 
-# # Inference:
-# echo "Start inference..."
-# python inference/infer_multi_command.py  \
-#     --gpus=$gpu_nodes \
-#     --data_path ./data/CodeTask \
-#     --inference_tasks CONCODE,CodeTrans,CodeSearchNet,BFP \
-#     --model_name_or_path ./PTM/$model_name \
-#     --inference_model_path ./outputs_LLM-CL/cl/$model_name/Tree_LoRA_$now \
-#     --inference_batch 8 \
-#     --max_prompt_len 1024 \
-#     --max_ans_len 512 \
-#     --seed 1234 \
-#     --CL_method Tree_LoRA \
-#     --inference_output_path ./outputs_LLM-CL/cl/$model_name/Tree_LoRA_$now/predictions
+# Inference:
+echo "Start inference..."
+python inference/infer_multi_command.py  \
+    --gpus=$gpu_nodes \
+    --data_path ./data/CodeTask \
+    --inference_tasks CONCODE,CodeTrans,CodeSearchNet,BFP \
+    --model_name_or_path ./PTM/$model_name \
+    --inference_model_path ./outputs_LLM-CL/cl/$model_name/Tree_LoRA_$now \
+    --inference_batch 32 \
+    --max_prompt_len 1024 \
+    --max_ans_len 512 \
+    --seed 1234 \
+    --CL_method Tree_LoRA \
+    --inference_output_path ./outputs_LLM-CL/cl/$model_name/Tree_LoRA_$now/predictions
 
-# # Collect results:
-# echo "Start collecting results..."
-# python inference/collect_results.py --inference_tasks C-STANCE,FOMC,MeetingBank,Py150,ScienceQA,NumGLUE-cm,NumGLUE-ds,20Minuten --data_path ./outputs_LLM-CL/cl/$model_name/Tree_LoRA_$now/predictions
+# Collect results:
+echo "Start collecting results..."
+python inference/collect_results.py --inference_tasks C-STANCE,FOMC,MeetingBank,Py150,ScienceQA,NumGLUE-cm,NumGLUE-ds,20Minuten --data_path ./outputs_LLM-CL/cl/$model_name/Tree_LoRA_$now/predictions

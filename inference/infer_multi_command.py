@@ -280,7 +280,7 @@ def main():
                 evaluation_result = eval_QQP.eval(predicted_sequences, ground_truths)
             else:
                 # default using accuracy
-                evaluation_result = eval_QQP.eval(predicted_sequences, ground_truths)
+                evaluation_result = eval_MeetingBank.eval(predicted_sequences, ground_truths)
             
             # if args.global_rank <= 0:  # only one process is running
             print("***** Saving inference results *****")
