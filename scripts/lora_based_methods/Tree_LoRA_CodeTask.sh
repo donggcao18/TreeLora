@@ -60,4 +60,4 @@ python inference/infer_multi_command.py  \
 
 # Collect results:
 echo "Start collecting results..."
-python inference/collect_results.py --inference_tasks C-STANCE,FOMC,MeetingBank,Py150,ScienceQA,NumGLUE-cm,NumGLUE-ds,20Minuten --data_path ./outputs_LLM-CL/cl/$model_name/Tree_LoRA_$now/predictions
+python inference/collect_results.py --inference_tasks CONCODE,CodeTrans,CodeSearchNet,BFP --data_path ./outputs_LLM-CL/cl/$model_name/Tree_LoRA_$now/predictions

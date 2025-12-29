@@ -8,7 +8,7 @@ gpu_nodes="0"
 # model_name="Llama-3.2-1B-Instruct"
 #model_name="Llama-2-7b-chat"
 #model_name="Llama-3.1-8B-Instruct"
-model_name="Qwen2.5-7B-Instruct"
+model_name="Qwen2.5-1.5B-Instruct"
 #model_name="Mistral-7B-Instruct-v0.3"
 #model_name="gemma-2b-it"
 
@@ -24,14 +24,14 @@ deepspeed --include=localhost:$gpu_nodes  training/main.py  \
     --data_path ./data/LLM-CL-Benchmark/LLM-CL-Benchmark_500 \
     --dataset_name C-STANCE,FOMC,MeetingBank,Py150,ScienceQA,NumGLUE-cm,NumGLUE-ds,20Minuten \
     --model_name_or_path ./PTM/$model_name \
-    --per_device_train_batch_size 8 \
-    --per_device_eval_batch_size 4 \
+    --per_device_train_batch_size 16 \
+    --per_device_eval_batch_size 8 \
     --max_prompt_len 1024 \
     --max_ans_len 512 \
     --learning_rate 1e-4 \
     --weight_decay 0. \
     --num_train_epochs $epochs \
-    --gradient_accumulation_steps 8 \
+    --gradient_accumulation_steps 1 \
     --lr_scheduler_type cosine \
     --num_warmup_steps 0 \
     --seed 1234 \
@@ -51,7 +51,7 @@ python inference/infer_multi_command.py  \
     --inference_tasks C-STANCE,FOMC,MeetingBank,Py150,ScienceQA,NumGLUE-cm,NumGLUE-ds,20Minuten \
     --model_name_or_path ./PTM/$model_name \
     --inference_model_path ./outputs_LLM-CL/cl/$model_name/Tree_LoRA_$now \
-    --inference_batch 1 \
+    --inference_batch 16 \
     --max_prompt_len 1024 \
     --max_ans_len 512 \
     --seed 1234 \
