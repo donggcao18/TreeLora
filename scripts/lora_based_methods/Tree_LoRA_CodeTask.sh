@@ -13,7 +13,8 @@ model_name="Qwen2.5-Coder-1.5B"
 #model_name_or_path="mistralai/Mistral-7B-Instruct-v0.3"
 #model_name_or_path="google/gemma-2b-it"
 
-codetask_tasks="CONCODE,CodeTrans,CodeSearchNet,BFP,KodCode,RunBugRun,TheVault_Csharp,CoST"
+# codetask_tasks="CONCODE,CodeTrans,CodeSearchNet,BFP,KodCode,RunBugRun,TheVault_Csharp,CoST"
+codetask_tasks="CONCODE,CodeTrans,CodeSearchNet"
 
 #epochs=1,1,5,5,1,5,5,5
 epochs=1,1,1,1,1,1,1,1
@@ -30,8 +31,8 @@ deepspeed --include=localhost:$gpu_nodes training/main.py  \
     --data_path CODETASK_HF \
     --dataset_name $codetask_tasks \
     --model_name_or_path $model_name_or_path \
-    --per_device_train_batch_size 16 \
-    --per_device_eval_batch_size 8 \
+    --per_device_train_batch_size 4 \
+    --per_device_eval_batch_size 4 \
     --max_prompt_len 1024 \
     --max_ans_len 512 \
     --num_train $num_train \
