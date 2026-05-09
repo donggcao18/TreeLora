@@ -13,20 +13,23 @@ model_name="Qwen2.5-Coder-1.5B"
 #model_name_or_path="mistralai/Mistral-7B-Instruct-v0.3"
 #model_name_or_path="google/gemma-2b-it"
 
+codetask_tasks="CONCODE,CodeTrans,CodeSearchNet,BFP,KodCode,RunBugRun,TheVault_Csharp,CoST"
+
 #epochs=1,1,5,5,1,5,5,5
-epochs=1,1,1,1
+epochs=1,1,1,1,1,1,1,1
 #epochs=5,3,7,5,3,5,5,7
 
 reg=0.5
 num_train=100
 num_eval=100
 num_test=100
+prediction_only=true
 
 # Train:
 echo "Start training..."
 deepspeed --include=localhost:$gpu_nodes training/main.py  \
     --data_path CODETASK_HF \
-    --dataset_name CONCODE,CodeTrans,CodeSearchNet,BFP \
+    --dataset_name $codetask_tasks \
     --model_name_or_path $model_name_or_path \
     --per_device_train_batch_size 16 \
     --per_device_eval_batch_size 8 \
@@ -55,7 +58,7 @@ echo "Start inference..."
 python inference/infer_multi_command.py  \
     --gpus=$gpu_nodes \
     --data_path CODETASK_HF \
-    --inference_tasks CONCODE,CodeTrans,CodeSearchNet,BFP \
+    --inference_tasks $codetask_tasks \
     --model_name_or_path $model_name_or_path \
     --inference_model_path ./outputs_LLM-CL/cl/$model_name/Tree_LoRA_$now \
     --inference_batch 32 \
@@ -66,8 +69,11 @@ python inference/infer_multi_command.py  \
     --num_test $num_test \
     --seed 1234 \
     --CL_method Tree_LoRA \
-    --inference_output_path ./outputs_LLM-CL/cl/$model_name/Tree_LoRA_$now/predictions
+    --inference_output_path ./outputs_LLM-CL/cl/$model_name/Tree_LoRA_$now/predictions \
+    $( [ "$prediction_only" = true ] && echo "--prediction_only" )
 
 # Collect results:
-echo "Start collecting results..."
-python inference/collect_results.py --inference_tasks CONCODE,CodeTrans,CodeSearchNet,BFP --data_path ./outputs_LLM-CL/cl/$model_name/Tree_LoRA_$now/predictions
+if [ "$prediction_only" != true ]; then
+    echo "Start collecting results..."
+    python inference/collect_results.py --inference_tasks $codetask_tasks --data_path ./outputs_LLM-CL/cl/$model_name/Tree_LoRA_$now/predictions
+fi

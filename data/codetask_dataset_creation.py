@@ -2,7 +2,16 @@ from datasets import load_dataset
 
 
 CODETASK_HF_REPO = "dongg18/CODETASK_with_instruction_pool"
-CODETASK_NAMES = {"CONCODE", "CodeTrans", "CodeSearchNet", "BFP"}
+CODETASK_NAMES = {
+    "BFP",
+    "CONCODE",
+    "CoST",
+    "CodeSearchNet",
+    "CodeTrans",
+    "KodCode",
+    "RunBugRun",
+    "TheVault_Csharp",
+}
 
 
 def create_codetask_dataset(dataset_name, seed, num_train=-1, num_eval=-1, num_test=-1):

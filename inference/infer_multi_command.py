@@ -102,6 +102,11 @@ def parse_args():
         default=-1,
         help="Number of test examples per task to evaluate. Use -1 for all examples.",
     )
+    parser.add_argument(
+        "--prediction_only",
+        action="store_true",
+        help="Run generation and save prediction files without computing task metrics.",
+    )
     #  add other inference params
     parser.add_argument(
         "--inference_tasks",
@@ -271,9 +276,11 @@ def main():
 
             print(f'Results saved to: {output_file}')
 
-            # Get Accuracy/ROUGE/BLEU/...
+            # Get Accuracy/ROUGE/BLEU/... unless this is a prediction-only run.
             # The evaluation result is stored in a dictionary. e.g. {"accuracy": .., "rouge-L": ..}
-            if inference_task == "ScienceQA":
+            if args.prediction_only:
+                evaluation_result = {}
+            elif inference_task == "ScienceQA":
                 evaluation_result = eval_ScienceQA.eval(predicted_sequences, ground_truths)
             elif inference_task == "MeetingBank":
                 evaluation_result = eval_MeetingBank.eval(predicted_sequences, ground_truths)

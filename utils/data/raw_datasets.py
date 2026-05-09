@@ -9,7 +9,16 @@ import os
 
 
 CODETASK_HF_REPO = "dongg18/CODETASK_with_instruction_pool"
-CODETASK_NAMES = {"CONCODE", "CodeTrans", "CodeSearchNet", "BFP"}
+CODETASK_NAMES = {
+    "BFP",
+    "CONCODE",
+    "CoST",
+    "CodeSearchNet",
+    "CodeTrans",
+    "KodCode",
+    "RunBugRun",
+    "TheVault_Csharp",
+}
 
 
 # The template prompt dataset class that all new dataset porting needs to
