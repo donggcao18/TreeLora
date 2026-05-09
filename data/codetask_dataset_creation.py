@@ -1,55 +1,41 @@
-import os
-import json
-import hashlib 
 from datasets import load_dataset
-from tqdm import tqdm
-
-FOLDER_NAME = os.path.dirname(os.path.abspath(__file__))
-
-TASK_LIST= ['CodeTrans', 'CodeSearchNet', 'BFP', 'CONCODE']
-TEXT_KEYS = {'CONCODE': 'nl',
-            'CodeTrans': 'java',
-            'CodeSearchNet': 'code',   
-            'BFP': 'buggy'}
-LABEL_KEYS = {'CONCODE': 'code',
-            'CodeTrans': 'cs',
-            'CodeSearchNet': 'docstring',
-            'BFP': 'fixed'}
-
-DEFINITION ={ 'CONCODE': 'Generate Java code from the following English description: ',
-            'CodeTrans': 'Translate the following Java code into C#: ',
-            'CodeSearchNet': 'Summarize the following Ruby code into English: ',
-            'BFP': 'Refactor or improve the following Java code: '}
-
-HUGGINGFACE_DATASET = {'CONCODE': 'AhmedSSoliman/CodeXGLUE-CONCODE',
-                    'CodeTrans': 'CM/codexglue_codetrans',
-                    'CodeSearchNet': 'semeru/code-text-ruby',
-                    'BFP': 'ayeshgk/code_x_glue_cc_code_refinement_annotated'}
 
 
-def convert_to_codetask(split_name="train"):
-    for task in TASK_LIST:
-        save_dir = os.path.join(FOLDER_NAME, task)
-        os.makedirs(save_dir, exist_ok=True)
-        dataset = load_dataset(HUGGINGFACE_DATASET[task], split=split_name)
-        
-        output_data = []
+CODETASK_HF_REPO = "dongg18/CODETASK_with_instruction_pool"
+CODETASK_NAMES = {"CONCODE", "CodeTrans", "CodeSearchNet", "BFP"}
 
-        for i, example in enumerate(tqdm(dataset, desc=f"Processing {split_name}")):
-            input_text = DEFINITION[task] + example[TEXT_KEYS[task]]
-            output_text = example[LABEL_KEYS[task]]
-            
-            output_data.append({
-                "prompt": input_text,
-                "answer": output_text
-            })
 
-        with open(os.path.join(save_dir, f"{split_name}.json"), "w", encoding="utf-8") as f:
-            json.dump(output_data, f, ensure_ascii=False, indent=2)
+def create_codetask_dataset(dataset_name, seed, num_train=-1, num_eval=-1, num_test=-1):
+    if dataset_name not in CODETASK_NAMES:
+        raise ValueError(
+            f"Unsupported CodeTask dataset '{dataset_name}'. "
+            f"Expected one of: {', '.join(sorted(CODETASK_NAMES))}"
+        )
 
-# 🔁 Run for all splits
-for split in ["train", "validation", "test"]:
-    try:
-        convert_to_codetask(split)
-    except Exception as e:
-        print(f"⚠️  Skipped {split}: {e}")
+    data_dict = {}
+    split_sizes = {
+        "train": num_train,
+        "validation": num_eval,
+        "test": num_test,
+    }
+
+    for split, size in split_sizes.items():
+        dataset = load_dataset(
+            CODETASK_HF_REPO,
+            data_files={split: f"{dataset_name}/{split}-*.parquet"},
+            split=split,
+        )
+        dataset = dataset.remove_columns([
+            column for column in dataset.column_names
+            if column not in ("input", "output")
+        ])
+        dataset = dataset.rename_column("input", "prompt")
+        dataset = dataset.rename_column("output", "answer")
+
+        size = int(size)
+        if size != -1:
+            dataset = dataset.shuffle(seed=seed).select(range(size))
+
+        data_dict[split] = dataset
+
+    return data_dict["train"], data_dict["validation"], data_dict["test"]

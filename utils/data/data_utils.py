@@ -215,6 +215,9 @@ def get_raw_dataset(dataset_name, output_path, seed, local_rank, for_backbone=Fa
     if "Anthropic/hh-rlhf" in dataset_name:
         return raw_datasets.AnthropichhrlhfDataset(output_path, seed,
                                                    local_rank, dataset_name)
+    elif os.path.basename(os.path.normpath(dataset_name)) in raw_datasets.CODETASK_NAMES:
+        return raw_datasets.CodeTaskHFDataset(output_path, seed, local_rank,
+                                              dataset_name)
     else:
         return raw_datasets.LocalJsonFileDataset(output_path, seed, local_rank,
                                                  dataset_name, for_backbone=for_backbone)

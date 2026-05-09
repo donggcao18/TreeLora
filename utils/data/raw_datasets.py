@@ -8,6 +8,10 @@ import re
 import os
 
 
+CODETASK_HF_REPO = "dongg18/CODETASK_with_instruction_pool"
+CODETASK_NAMES = {"CONCODE", "CodeTrans", "CodeSearchNet", "BFP"}
+
+
 # The template prompt dataset class that all new dataset porting needs to
 # follow in order to have a unified API and unified data format.
 class PromptRawDataset(object):
@@ -123,4 +127,57 @@ class LocalJsonFileDataset(PromptRawDataset):
     def get_prompt_and_answer(self, sample):
         if sample['prompt'] is not None and sample['answer'] is not None:
             return sample['prompt'] + "\n" + sample['answer']
+        return None
+
+
+class CodeTaskHFDataset(PromptRawDataset):
+
+    def __init__(self, output_path, seed, local_rank, dataset_name):
+        super().__init__(output_path, seed, local_rank, dataset_name)
+        self.task_name = os.path.basename(os.path.normpath(dataset_name))
+        if self.task_name not in CODETASK_NAMES:
+            raise ValueError(f"Unsupported CodeTask dataset: {dataset_name}")
+
+        self.dataset_name = CODETASK_HF_REPO
+        self.dataset_name_clean = f"codetask_hf_{self.task_name}"
+        self.raw_datasets = {}
+        for split in ["train", "validation", "test"]:
+            dataset = load_dataset(
+                CODETASK_HF_REPO,
+                data_files={split: f"{self.task_name}/{split}-*.parquet"},
+                split=split,
+            )
+            keep_columns = {"input", "output"}
+            remove_columns = [
+                column for column in dataset.column_names
+                if column not in keep_columns
+            ]
+            if remove_columns:
+                dataset = dataset.remove_columns(remove_columns)
+            dataset = dataset.rename_column("input", "prompt")
+            dataset = dataset.rename_column("output", "answer")
+            self.raw_datasets[split] = dataset
+
+    def get_train_data(self):
+        return self.raw_datasets["train"]
+
+    def get_eval_data(self):
+        return self.raw_datasets["validation"]
+
+    def get_test_data(self):
+        return self.raw_datasets["test"]
+
+    def get_prompt(self, sample):
+        if sample["prompt"] is not None:
+            return sample["prompt"]
+        return None
+
+    def get_answer(self, sample):
+        if sample["answer"] is not None:
+            return sample["answer"]
+        return ""
+
+    def get_prompt_and_answer(self, sample):
+        if sample["prompt"] is not None and sample["answer"] is not None:
+            return sample["prompt"] + "\n" + sample["answer"]
         return None

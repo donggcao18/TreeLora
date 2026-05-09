@@ -21,7 +21,7 @@ reg=0.5
 # Train:
 echo "Start training..."
 deepspeed --include=localhost:$gpu_nodes training/main.py  \
-    --data_path ./data/CodeTask \
+    --data_path CODETASK_HF \
     --dataset_name CONCODE,CodeTrans,CodeSearchNet,BFP \
     --model_name_or_path ./PTM/$model_name \
     --per_device_train_batch_size 16 \
@@ -47,7 +47,7 @@ deepspeed --include=localhost:$gpu_nodes training/main.py  \
 echo "Start inference..."
 python inference/infer_multi_command.py  \
     --gpus=$gpu_nodes \
-    --data_path ./data/CodeTask \
+    --data_path CODETASK_HF \
     --inference_tasks CONCODE,CodeTrans,CodeSearchNet,BFP \
     --model_name_or_path ./PTM/$model_name \
     --inference_model_path ./outputs_LLM-CL/cl/$model_name/Tree_LoRA_$now \
