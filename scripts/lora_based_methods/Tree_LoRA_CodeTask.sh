@@ -23,7 +23,6 @@ reg=0.5
 num_train=100
 num_eval=100
 num_test=100
-prediction_only=true
 
 # Train:
 echo "Start training..."
@@ -49,31 +48,6 @@ deepspeed --include=localhost:$gpu_nodes training/main.py  \
     --deepspeed \
     --print_loss \
     --CL_method Tree_LoRA \
+    --eval_after_task \
     --output_dir ./outputs_LLM-CL/cl/$model_name/Tree_LoRA_$now \
     --reg $reg
-
-
-# Inference:
-echo "Start inference..."
-python inference/infer_multi_command.py  \
-    --gpus=$gpu_nodes \
-    --data_path CODETASK_HF \
-    --inference_tasks $codetask_tasks \
-    --model_name_or_path $model_name_or_path \
-    --inference_model_path ./outputs_LLM-CL/cl/$model_name/Tree_LoRA_$now \
-    --inference_batch 32 \
-    --max_prompt_len 1024 \
-    --max_ans_len 512 \
-    --num_train $num_train \
-    --num_eval $num_eval \
-    --num_test $num_test \
-    --seed 1234 \
-    --CL_method Tree_LoRA \
-    --inference_output_path ./outputs_LLM-CL/cl/$model_name/Tree_LoRA_$now/predictions \
-    $( [ "$prediction_only" = true ] && echo "--prediction_only" )
-
-# Collect results:
-if [ "$prediction_only" != true ]; then
-    echo "Start collecting results..."
-    python inference/collect_results.py --inference_tasks $codetask_tasks --data_path ./outputs_LLM-CL/cl/$model_name/Tree_LoRA_$now/predictions
-fi

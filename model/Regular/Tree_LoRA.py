@@ -40,6 +40,12 @@ class Tree_LoRA(CL_Base_Model):
         num_task = len(self.train_task_list)
         args.num_tasks = num_task
         self.kd_lora_tree = KD_LoRA_Tree(args)
+
+    def _resolve_max_ans_len(self, task_id):
+        max_ans_len = getattr(self.args, "max_ans_len", 256)
+        if isinstance(max_ans_len, (list, tuple)):
+            return int(max_ans_len[task_id])
+        return int(max_ans_len)
     
     def train_one_task(self, task, task_id, epochs):
         # if task_id > 0:
@@ -133,7 +139,30 @@ class Tree_LoRA(CL_Base_Model):
                 if self.args.global_rank == 0:
                     if tmp_rounds % 30 == 0:
                         self.tiktok.print_time()
-                
+
+            if getattr(self.args, "eval_after_task", False):
+                print_rank_0(
+                    f"***** Evaluating generation metrics, Epoch {epoch + 1}/{epochs} on task {task} *****",
+                    self.args.global_rank)
+                eval_result, eval_predictions = self.task_generation_evaluation(
+                    task,
+                    eval_dataloader,
+                    self.device,
+                    max_ans_len=self._resolve_max_ans_len(task_id),
+                    return_predictions=True,
+                )
+                print_rank_0(f"[task={task}] validation result: {eval_result}", self.args.global_rank)
+
+                if self.args.global_rank == 0 and self.args.output_dir is not None:
+                    safe_task_name = str(task).replace("/", "_").replace(":", "_")
+                    pred_dir = os.path.join(self.args.output_dir, "predictions", f"eval-epoch{epoch + 1}")
+                    os.makedirs(pred_dir, exist_ok=True)
+                    pred_file = os.path.join(pred_dir, f"{safe_task_name}.json")
+                    with open(pred_file, "w", encoding="utf-8") as f:
+                        json.dump({"metrics": eval_result, "predictions": eval_predictions}, f, ensure_ascii=False, indent=2)
+                    print_rank_0(f"Saved eval predictions to {pred_file}", self.args.global_rank)
+                self.model.train()
+
         
         #### SAVE ####
         if self.args.output_dir is not None:
@@ -155,7 +184,7 @@ class Tree_LoRA(CL_Base_Model):
         if self.args.reg > 0:
             # after each task:
             self.kd_lora_tree.end_task(task_id=task_id)
-    
+
     # def save_model(self, i_task):
     #     pass
     

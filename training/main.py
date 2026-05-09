@@ -131,6 +131,11 @@ def parse_args():
         default=-1,
         help="Number of test examples per task to use. Use -1 for all examples.",
     )
+    parser.add_argument(
+        "--eval_after_task",
+        action="store_true",
+        help="Run generation metrics on the validation split after each training epoch.",
+    )
 
     parser.add_argument(
         "--learning_rate",
@@ -499,7 +504,7 @@ def main():
                                     sampler=train_sampler,
                                     batch_size=args.per_device_train_batch_size)
         eval_dataloader = DataLoader(eval_dataset,
-                                    collate_fn=data_collator,
+                                    collate_fn=inf_data_collator,
                                     sampler=eval_sampler,
                                     batch_size=args.per_device_eval_batch_size)
         test_dataloader = DataLoader(test_dataset,
