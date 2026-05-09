@@ -113,6 +113,24 @@ def parse_args():
         default=512,
         help="The maximum sequence length.",
     )
+    parser.add_argument(
+        "--num_train",
+        type=int,
+        default=-1,
+        help="Number of training examples per task to use. Use -1 for all examples.",
+    )
+    parser.add_argument(
+        "--num_eval",
+        type=int,
+        default=-1,
+        help="Number of eval examples per task to use. Use -1 for all examples.",
+    )
+    parser.add_argument(
+        "--num_test",
+        type=int,
+        default=-1,
+        help="Number of test examples per task to use. Use -1 for all examples.",
+    )
 
     parser.add_argument(
         "--learning_rate",
@@ -440,7 +458,10 @@ def main():
             args.local_rank,
             dataset_path,
             args.data_output_path,
-            args.seed
+            args.seed,
+            num_train=args.num_train,
+            num_eval=args.num_eval,
+            num_test=args.num_test
         )
 
         # DataLoaders creation:

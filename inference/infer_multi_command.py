@@ -84,6 +84,24 @@ def parse_args():
         default=4,
         help="Inference batch size.",
     )
+    parser.add_argument(
+        "--num_train",
+        type=int,
+        default=-1,
+        help="Number of training examples per task to load. Use -1 for all examples.",
+    )
+    parser.add_argument(
+        "--num_eval",
+        type=int,
+        default=-1,
+        help="Number of eval examples per task to load. Use -1 for all examples.",
+    )
+    parser.add_argument(
+        "--num_test",
+        type=int,
+        default=-1,
+        help="Number of test examples per task to evaluate. Use -1 for all examples.",
+    )
     #  add other inference params
     parser.add_argument(
         "--inference_tasks",
@@ -164,6 +182,15 @@ def main():
             os.makedirs(args.inference_output_path)
         with open(args.inference_output_path + "/results-" + str(round) + "-" + str(i_task) + "-" + task + ".json", "w+", encoding='utf-8') as file:
             json.dump(df, file, ensure_ascii=False)
+        jsonl_path = args.inference_output_path + "/predictions-" + str(round) + "-" + str(i_task) + "-" + task + ".jsonl"
+        with open(jsonl_path, "w", encoding="utf-8") as file:
+            for source, ground_truth, prediction in zip(sources_sequences, ground_truths, predicted_sequences):
+                row = {
+                    "source": source,
+                    "ground-truth": ground_truth,
+                    "prediction": prediction,
+                }
+                file.write(json.dumps(row, ensure_ascii=False) + "\n")
     
     # set evaluation batch size
     # only support bs = 1, cause right padding training logic
