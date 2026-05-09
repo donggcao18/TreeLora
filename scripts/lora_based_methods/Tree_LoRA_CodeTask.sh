@@ -23,7 +23,7 @@ echo "Start training..."
 deepspeed --include=localhost:$gpu_nodes training/main.py  \
     --data_path CODETASK_HF \
     --dataset_name CONCODE,CodeTrans,CodeSearchNet,BFP \
-    --model_name_or_path ./PTM/$model_name \
+    --model_name_or_path Qwen/Qwen2.5-Coder-1.5B \
     --per_device_train_batch_size 16 \
     --per_device_eval_batch_size 8 \
     --max_prompt_len 1024 \
