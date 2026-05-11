@@ -33,6 +33,7 @@ from transformers import (
     LlamaForCausalLM,
     LlamaTokenizer,
     AutoModelForCausalLM,
+    GenerationConfig,
 )
 
 import deepspeed
@@ -114,9 +115,28 @@ def parse_args():
     parser.add_argument(
         "--temperature",
         type=float,
-        default=0.1,
-        help="Generate temperature params.",
+        default=0.2,
+        help="Temperature for generation.",
     )
+    parser.add_argument('--do_sample',
+                        action='store_true',
+                        help='Whether to use sampling for generation.')
+    parser.add_argument('--top_p',
+                        type=float,
+                        default=0.95,
+                        help='Top-p for generation.')
+    parser.add_argument('--top_k',
+                        type=int,
+                        default=0,
+                        help='Top-k for generation (0 disables top-k sampling).')
+    parser.add_argument('--repetition_penalty',
+                        type=float,
+                        default=1.0,
+                        help='Repetition penalty for generation.')
+    parser.add_argument('--num_return_sequences',
+                        type=int,
+                        default=5,
+                        help='Number of generated sequences per prompt.')
     
     parser.add_argument(
         "--lora_depth",
@@ -159,6 +179,11 @@ def parse_args():
     parser.add_argument('--CL_method',
                         default=None,
                         help='continual learning method used')
+    parser.add_argument('--benchmark',
+                        type=str,
+                        default='non-executable',
+                        choices=['non-executable', 'executable'],
+                        help='Benchmark type for inference dataset loading and generation output.')
     
     parser.add_argument("--round", type=int, required=True)
     parser.add_argument("--current_rank", type=int, required=True)
@@ -215,6 +240,26 @@ def main():
         sources_sequences = []
         ground_truths = []
         model.eval()
+        is_executable = getattr(args, "benchmark", "non-executable") != "non-executable"
+        if is_executable:
+            num_return_sequences = int(getattr(args, "num_return_sequences", 1))
+            do_sample = args.do_sample or num_return_sequences > 1
+            generation_config = GenerationConfig(
+                temperature=args.temperature,
+                do_sample=do_sample,
+                top_p=args.top_p,
+                top_k=args.top_k,
+                repetition_penalty=args.repetition_penalty,
+                num_return_sequences=num_return_sequences,
+            )
+        else:
+            num_return_sequences = 1
+            generation_config = GenerationConfig(
+                temperature=args.temperature,
+                do_sample=args.do_sample,
+                num_return_sequences=1,
+            )
+
         for step, batch in enumerate(infer_dataloader):
             #  add prompts, choosen, rejected
             # implementation, batch = {k: v.to(device) for k, v in batch.items()}
@@ -234,20 +279,27 @@ def main():
                 # generate_ids = model.generate(batch['input_ids'], max_new_tokens=args.max_ans_len,
                 #                               pad_token_id=tokenizer.eos_token_id, attention_mask = batch['attention_mask'], temperature=0.7, do_sample=True, repetition_penalty=2.0 )
                 # sft config
+                pad_token_id = tokenizer.pad_token_id
+                if pad_token_id is None:
+                    pad_token_id = tokenizer.eos_token_id
                 generate_ids = model.generate(input_ids=batch['input_ids'],
                                               attention_mask=batch['attention_mask'],
                                               max_new_tokens=args.max_ans_len,
-                                              bos_token_id=tokenizer.bos_token_id,
                                               eos_token_id=tokenizer.eos_token_id,
-                                              pad_token_id=tokenizer.unk_token_id,
-                                              temperature=args.temperature,
-                                              do_sample=True,
-                                              num_return_sequences=1,
+                                              pad_token_id=pad_token_id,
+                                              generation_config=generation_config,
                                               use_cache=True
                                               )
             sequences = tokenizer.batch_decode(generate_ids[:, prompt_len:], skip_special_tokens=True,
                                                clean_up_tokenization_spaces=False)
-            predicted_sequences += sequences
+            if is_executable and num_return_sequences > 1:
+                batch_preds = [
+                    sequences[i:i + num_return_sequences]
+                    for i in range(0, len(sequences), num_return_sequences)
+                ]
+                predicted_sequences.extend(batch_preds)
+            else:
+                predicted_sequences += sequences
         return sources_sequences, predicted_sequences, ground_truths
     
     tokenizer = load_hf_tokenizer(args.model_name_or_path, fast_tokenizer=True)
@@ -426,7 +478,8 @@ def main():
             dataset_path,
             args.data_output_path,
             args.seed,
-            distributed=False
+            distributed=False,
+            benchmark=args.benchmark
         )
         if args.CL_method != 'FIX':
             inf_data_collator = DataCollator(

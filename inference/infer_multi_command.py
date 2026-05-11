@@ -74,9 +74,28 @@ def parse_args():
     parser.add_argument(
         "--temperature",
         type=float,
-        default=0.1,
-        help="Generate temperature params.",
+        default=0.2,
+        help="Temperature for generation.",
     )
+    parser.add_argument('--do_sample',
+                        action='store_true',
+                        help='Whether to use sampling for generation.')
+    parser.add_argument('--top_p',
+                        type=float,
+                        default=0.95,
+                        help='Top-p for generation.')
+    parser.add_argument('--top_k',
+                        type=int,
+                        default=0,
+                        help='Top-k for generation (0 disables top-k sampling).')
+    parser.add_argument('--repetition_penalty',
+                        type=float,
+                        default=1.0,
+                        help='Repetition penalty for generation.')
+    parser.add_argument('--num_return_sequences',
+                        type=int,
+                        default=5,
+                        help='Number of generated sequences per prompt.')
     
     parser.add_argument(
         "--inference_batch",
@@ -113,6 +132,11 @@ def parse_args():
     parser.add_argument('--CL_method',
                         default=None,
                         help='continual learning method used')
+    parser.add_argument('--benchmark',
+                        type=str,
+                        default='non-executable',
+                        choices=['non-executable', 'executable'],
+                        help='Benchmark type for inference dataset loading and generation output.')
     
     parser.add_argument('--start_round',
                         default=0,
@@ -278,6 +302,8 @@ def main():
                 evaluation_result = eval_BoolQA.eval(predicted_sequences, ground_truths)
             elif inference_task == "QQP":
                 evaluation_result = eval_QQP.eval(predicted_sequences, ground_truths)
+            elif getattr(args, "benchmark", "non-executable") == "executable":
+                evaluation_result = {}
             else:
                 # default using accuracy
                 evaluation_result = eval_MeetingBank.eval(predicted_sequences, ground_truths)
@@ -311,7 +337,11 @@ def run_inference(current_rank, args):
     # add other args:
     for key, value in vars(args).items():
         if key not in ["master_port", "gpus"]:
-            command.append(f"--{key} {value}")
+            if isinstance(value, bool):
+                if value:
+                    command.append(f"--{key}")
+            else:
+                command.append(f"--{key} {value}")
     
     # print red command:
     print("\033[31m" + " ".join(command) + "\033[0m")
