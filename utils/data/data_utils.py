@@ -210,8 +210,17 @@ class Llama:
 
 
 
-def get_raw_dataset(dataset_name, output_path, seed, local_rank, for_backbone=False):
+def get_raw_dataset(dataset_name, output_path, seed, local_rank, for_backbone=False, benchmark="non-executable"):
     # datasets for RLHF
+    if benchmark == "executable":
+        return raw_datasets.ExecutableHFDataset(output_path, seed, local_rank,
+                                                dataset_name)
+    if benchmark != "non-executable":
+        raise ValueError(
+            f"Unsupported benchmark '{benchmark}'. "
+            "Expected 'non-executable' or 'executable'."
+        )
+
     if "Anthropic/hh-rlhf" in dataset_name:
         return raw_datasets.AnthropichhrlhfDataset(output_path, seed,
                                                    local_rank, dataset_name)
@@ -266,8 +275,10 @@ def get_prompt_dataset(current_dataset, raw_dataset, add_sys_prefix=False, sampl
 
 # step 2
 def create_dataset(local_rank, dataset_name, output_path,
-                   seed, add_sys_prefix=False, for_backbone=False, sample_ratio=None):
-    raw_dataset = get_raw_dataset(dataset_name, output_path, seed, local_rank, for_backbone=for_backbone)
+                   seed, add_sys_prefix=False, for_backbone=False, sample_ratio=None,
+                   benchmark="non-executable"):
+    raw_dataset = get_raw_dataset(dataset_name, output_path, seed, local_rank,
+                                  for_backbone=for_backbone, benchmark=benchmark)
 
     train_dataset = raw_dataset.get_train_data()
     train_dataset = get_prompt_dataset(train_dataset, raw_dataset, add_sys_prefix=add_sys_prefix, sample_ratio=sample_ratio)
@@ -290,13 +301,16 @@ def create_prompt_dataset(local_rank,
                           add_sys_prefix=False,
                           for_backbone=False,
                           distributed=True,
-                          sample_ratio=None
+                          sample_ratio=None,
+                          benchmark="non-executable"
                           ):
     """
     Creates the prompt dataset
     """
     os.makedirs(output_path, exist_ok=True)
     fname = data_path
+    if benchmark != "non-executable":
+        fname = f"{benchmark}_{fname}"
     fname = f"{fname}_seed{seed}"
     fname = "_".join(fname.split("/"))
     fname = hashlib.sha256(fname.encode()).hexdigest(
@@ -314,7 +328,8 @@ def create_prompt_dataset(local_rank,
     if local_rank <= 0:
         train_dataset, eval_dataset, test_dataset = create_dataset(
             local_rank, data_path, output_path,
-            seed, add_sys_prefix=add_sys_prefix, for_backbone=for_backbone, sample_ratio=sample_ratio)
+            seed, add_sys_prefix=add_sys_prefix, for_backbone=for_backbone,
+            sample_ratio=sample_ratio, benchmark=benchmark)
 
         torch.save(train_dataset, train_fname)
         torch.save(eval_dataset, eval_fname)

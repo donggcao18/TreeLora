@@ -26,4 +26,6 @@ Method2Class = {"EWC"      : EWC,
 
 AllDatasetName = ["C-STANCE", "FOMC", "MeetingBank", "Py150", "ScienceQA", "NumGLUE-cm", "NumGLUE-ds", "20Minuten"]
 
+AllDatasetNameExecutable = ["python", "cpp", "swift", "rust", "csharp", "java", "php", "typescript", "shell"]
+
 OLoRADatasetStandardName = ["dbpedia", "amazon", "yahoo", "agnews"]

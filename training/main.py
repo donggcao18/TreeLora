@@ -55,7 +55,7 @@ from model.Replay.LFPT5 import getInitialPrompt
 from model.Dynamic_network.DualPrompt import convert_DualPrompt_model
 
 
-from params import Method2Class, AllDatasetName, OLoRADatasetStandardName
+from params import Method2Class, AllDatasetName, AllDatasetNameExecutable, OLoRADatasetStandardName
 
 
 #  check support for OPT and llama
@@ -73,8 +73,13 @@ def parse_args():
                         help='Path to the training dataset, a single data path.')
     parser.add_argument('--dataset_name',
                         type=list_of_strings,
-                        default='all',
+                        default=['all'],
                         help='Dataset to be used.')
+    parser.add_argument('--benchmark',
+                        type=str,
+                        default='non-executable',
+                        choices=['non-executable', 'executable'],
+                        help='Benchmark type. Use CodeTask/local datasets for non-executable, or CL4Code executable datasets for executable.')
     parser.add_argument(
         '--data_output_path',
         type=str,
@@ -427,7 +432,7 @@ def main():
 
 
     if args.dataset_name[0] == "all":
-        Datasets = AllDatasetName
+        Datasets = AllDatasetNameExecutable if args.benchmark == "executable" else AllDatasetName
     elif args.dataset_name[0].lower() == "olorastandard":
         print("Using OLoRA Standard Dataset")
         Datasets = OLoRADatasetStandardName
@@ -440,7 +445,8 @@ def main():
             args.local_rank,
             dataset_path,
             args.data_output_path,
-            args.seed
+            args.seed,
+            benchmark=args.benchmark
         )
 
         # DataLoaders creation:

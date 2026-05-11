@@ -2,14 +2,89 @@
 # SPDX-License-Identifier: Apache-2.0
 
 # DeepSpeed Team
-from datasets import load_dataset, load_from_disk
+from datasets import concatenate_datasets, load_dataset, load_from_disk
 from torch.utils.data import Subset
 import re
 import os
+import json
 
 
 CODETASK_HF_REPO = "dongg18/CODETASK_with_instruction_pool"
 CODETASK_NAMES = {"CONCODE", "CodeTrans", "CodeSearchNet", "BFP"}
+EXECUTABLE_HF_REPO = "ankhanhtran02/CL4Code-executable-datasets"
+EXECUTABLE_NAMES = {
+    "python",
+    "cpp",
+    "swift",
+    "rust",
+    "csharp",
+    "java",
+    "php",
+    "typescript",
+    "shell",
+}
+
+
+def _hf_token():
+    return os.environ.get("HF_TOKEN")
+
+
+def _load_split(repo_id, split):
+    return load_dataset(repo_id, split=split, token=_hf_token())
+
+
+def _limit_dataset(dataset, max_samples=-1, seed=0):
+    if max_samples == -1 or len(dataset) <= max_samples:
+        return dataset
+    return dataset.shuffle(seed=seed).select(range(max_samples))
+
+
+def _prepare_executable_columns(dataset):
+    keep_columns = {"instruction", "solution"}
+    remove_columns = [
+        column for column in dataset.column_names
+        if column not in keep_columns
+    ]
+    if remove_columns:
+        dataset = dataset.remove_columns(remove_columns)
+    dataset = dataset.rename_column("instruction", "prompt")
+    dataset = dataset.rename_column("solution", "answer")
+    return dataset
+
+
+def _load_executable_training_dataset(language, max_train_samples=-1, seed=0):
+    split_datasets = []
+    for split in ["train_OSS_Instruct", "train_McEval_Instruct"]:
+        dataset = _load_split(EXECUTABLE_HF_REPO, split)
+        dataset = dataset.filter(
+            lambda row: row["language"] == language and row["solution"] is not None
+        )
+        split_datasets.append(dataset)
+
+    train_dataset = (
+        split_datasets[0]
+        if len(split_datasets) == 1
+        else concatenate_datasets(split_datasets)
+    )
+    train_dataset = _limit_dataset(train_dataset, max_train_samples, seed)
+    dataset = _prepare_executable_columns(train_dataset)
+    if len(dataset) == 0:
+        raise ValueError(f"No training samples found for language={language}.")
+    return dataset
+
+
+def _load_executable_eval_dataset(language, max_eval_samples=-1, seed=0):
+    dataset = _load_split(EXECUTABLE_HF_REPO, "test_McEval")
+    dataset = dataset.filter(
+        lambda row: row["language"] == language and row["test"] is not None
+    )
+    dataset = _limit_dataset(dataset, max_eval_samples, seed)
+    dataset = _prepare_executable_columns(dataset)
+    if len(dataset) == 0:
+        raise ValueError(
+            f"No evaluation samples found in split=test_McEval for language={language}."
+        )
+    return dataset
 
 
 # The template prompt dataset class that all new dataset porting needs to
@@ -157,6 +232,62 @@ class CodeTaskHFDataset(PromptRawDataset):
             dataset = dataset.rename_column("input", "prompt")
             dataset = dataset.rename_column("output", "answer")
             self.raw_datasets[split] = dataset
+
+    def get_train_data(self):
+        return self.raw_datasets["train"]
+
+    def get_eval_data(self):
+        return self.raw_datasets["validation"]
+
+    def get_test_data(self):
+        return self.raw_datasets["test"]
+
+    def get_prompt(self, sample):
+        if sample["prompt"] is not None:
+            return sample["prompt"]
+        return None
+
+    def get_answer(self, sample):
+        if sample["answer"] is not None:
+            return sample["answer"]
+        return ""
+
+    def get_prompt_and_answer(self, sample):
+        if sample["prompt"] is not None and sample["answer"] is not None:
+            return sample["prompt"] + "\n" + sample["answer"]
+        return None
+
+
+class ExecutableHFDataset(PromptRawDataset):
+
+    def __init__(self, output_path, seed, local_rank, dataset_name):
+        super().__init__(output_path, seed, local_rank, dataset_name)
+        self.task_name = os.path.basename(os.path.normpath(dataset_name)).lower()
+        if self.task_name not in EXECUTABLE_NAMES:
+            raise ValueError(
+                f"Unsupported executable dataset: {dataset_name}. "
+                f"Expected one of: {', '.join(sorted(EXECUTABLE_NAMES))}"
+            )
+
+        self.dataset_name = EXECUTABLE_HF_REPO
+        self.dataset_name_clean = f"executable_hf_{self.task_name}"
+        train_dataset = _load_executable_training_dataset(
+            self.task_name, max_train_samples=-1, seed=seed
+        )
+        eval_dataset = _load_executable_eval_dataset(
+            self.task_name, max_eval_samples=-1, seed=seed
+        )
+        self.raw_datasets = {
+            "train": train_dataset,
+            "validation": eval_dataset,
+            "test": eval_dataset,
+        }
+
+        if local_rank in (-1, 0):
+            print("[executable train] Sample:")
+            print(json.dumps(train_dataset[0], ensure_ascii=False, indent=2))
+            print("[executable eval] Sample:")
+            print(json.dumps(eval_dataset[0], ensure_ascii=False, indent=2))
 
     def get_train_data(self):
         return self.raw_datasets["train"]
