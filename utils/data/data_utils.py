@@ -246,7 +246,8 @@ class PromptDataset(Dataset):
     def __getitem__(self, idx):
         return {
             "prompt": self.prompt_dataset[idx],
-            "answer": self.answer_dataset[idx]
+            "answer": self.answer_dataset[idx],
+            "index": idx,
         }
 
 
