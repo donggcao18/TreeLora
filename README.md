@@ -28,6 +28,9 @@ This repository contains the official PyTorch implementation of TreeLoRA, an eff
 ## Requirements
 
 The main dependencies are listed below. For a complete list, see `requirements.txt`:
+```bash
+conda create -n Tree-LoRA python=3.10 -y
+```
 
 ```
 accelerate==1.0.1
@@ -61,16 +64,9 @@ pip install flash-attn==2.6.3 --no-build-isolation
         | **IMDB**        |   **MNLI**    | **20Minuten** |
         | **agnews**      |   **COPA**    |   **SST-2**   |
 
--   2. Download the pre-trained model from HuggingFace and place it in the `./PTM/` directory. e.g., for Llama-3.2-1B-Instruct:
 
-        ```bash
-        cd ./PTM
-        git clone https://huggingface.co/meta-llama/Llama-3.2-1B-Instruct
-        apt-get update && apt-get install -y git-lfs
-        cd Llama-3.2-1B-Instruct && git lfs pull
-        ```
 
--   3. Unzip data
+-   2. Unzip data
         ```bash
         cd TreeLora/data/LLM-CL-Benchmark
         tar -xf LLM-CL-Benchmark_500.tar.xz
@@ -80,13 +76,8 @@ pip install flash-attn==2.6.3 --no-build-isolation
 To train and evaluate a method on the TRACE dataset, just run:
 
 ```bash
-export CUDA_VISIBLE_DEVICES=0
-export model_name="Qwen2.5-1.5B-Instruct"
-
-apt-get update && apt-get install -y git-lfs
-cd /root/workspace/TreeLora/PTM && git lfs install && cd Qwen2.5-1.5B-Instruct && git lfs pull
 # Run training script with default parameters (e.g., TreeLoRA)
-bash scripts/lora_based_methods/Tree_LoRA.sh
+bash scripts/lora_based_methods/Tree_LoRA_CodeTask.sh
 ```
 
 Key parameters in the training script:

@@ -3,27 +3,21 @@
 #get current time:
 now=$(date +"%m%d_%H%M%S")
 #get GPUs:
-gpu_nodes="0"
+gpu_nodes="0,1"
 
-# model_name_or_path="meta-llama/Llama-3.2-1B-Instruct"
-#model_name_or_path="meta-llama/Llama-2-7b-chat"
-#model_name_or_path="meta-llama/Llama-3.1-8B-Instruct"
+#huggingface model name or path
 model_name_or_path="Qwen/Qwen2.5-Coder-1.5B"
-model_name="Qwen2.5-Coder-1.5B"
-#model_name_or_path="mistralai/Mistral-7B-Instruct-v0.3"
-#model_name_or_path="google/gemma-2b-it"
+# model_name="Qwen2.5-Coder-1.5B"
 
-# codetask_tasks="CONCODE,CodeTrans,CodeSearchNet,BFP,KodCode,RunBugRun,TheVault_Csharp,CoST"
-codetask_tasks="CONCODE,CodeTrans,CodeSearchNet"
+codetask_tasks="CONCODE,CodeTrans,CodeSearchNet,BFP,KodCode,RunBugRun,TheVault_Csharp,CoST"
+# codetask_tasks="CONCODE,CodeTrans,CodeSearchNet"
 
-#epochs=1,1,5,5,1,5,5,5
-epochs=1,1,1,1,1,1,1,1
-#epochs=5,3,7,5,3,5,5,7
+epochs=3,3,3,3,3,3,3,3
 
 reg=0.5
-num_train=100
-num_eval=100
-num_test=100
+num_train=-1
+num_eval=10
+num_test=-1
 
 # Train:
 echo "Start training..."
@@ -33,15 +27,15 @@ deepspeed --include=localhost:$gpu_nodes training/main.py  \
     --model_name_or_path $model_name_or_path \
     --per_device_train_batch_size 4 \
     --per_device_eval_batch_size 4 \
-    --max_prompt_len 1024 \
-    --max_ans_len 512 \
+    --gradient_accumulation_steps 4 \
+    --max_prompt_len 512 \
+    --max_ans_len 320 \
     --num_train $num_train \
     --num_eval $num_eval \
     --num_test $num_test \
     --learning_rate 1e-4 \
     --weight_decay 0. \
     --num_train_epochs $epochs \
-    --gradient_accumulation_steps 1 \
     --lr_scheduler_type cosine \
     --num_warmup_steps 0 \
     --seed 1234 \
