@@ -3,7 +3,7 @@
 #get current time:
 now=$(date +"%m%d_%H%M%S")
 #get GPUs:
-gpu_nodes="0,1"
+gpu_nodes="0"
 
 #huggingface model name or path
 model_name_or_path="Qwen/Qwen2.5-Coder-1.5B"
@@ -27,7 +27,7 @@ deepspeed --include=localhost:$gpu_nodes training/main.py  \
     --model_name_or_path $model_name_or_path \
     --per_device_train_batch_size 4 \
     --per_device_eval_batch_size 4 \
-    --gradient_accumulation_steps 4 \
+    --gradient_accumulation_steps 8 \
     --num_train $num_train \
     --num_eval $num_eval \
     --num_test $num_test \
