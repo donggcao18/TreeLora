@@ -101,14 +101,14 @@ def parse_args():
     )
     parser.add_argument(
         "--max_prompt_len",
-        type=int,
+        type=list_of_strings,
         default=512,
         help="The maximum sequence length.",
     )
     # inference params
     parser.add_argument(
         "--max_ans_len",
-        type=int,
+        type=list_of_strings,
         default=256,
         help="The maximum answer length.",
     )
@@ -213,6 +213,19 @@ def parse_args():
     return args
 
 
+def resolve_task_lengths(values, task_count, name):
+    if isinstance(values, str):
+        values = values.split(',')
+    elif not isinstance(values, (list, tuple)):
+        values = [values]
+
+    if len(values) == 1:
+        return [int(values[0])] * task_count
+    if len(values) != task_count:
+        raise ValueError(f"{name} expects either 1 value or {task_count} values, got {len(values)}: {values}")
+    return [int(value) for value in values]
+
+
 def get_random_demonstrations(dem_num, infer_dataset, length_limit, task, tokenizer):
     length_limit_per_sample = length_limit / (dem_num * 2)
     demonstrations = []
@@ -253,7 +266,7 @@ def main():
     device = torch.device("cuda")
     tokenizer = load_hf_tokenizer(args.model_name_or_path, fast_tokenizer=True)
     
-    def prediction(model, infer_dataloader):
+    def prediction(model, infer_dataloader, max_ans_len):
         predicted_sequences = []
         sources_sequences = []
         ground_truths = []
@@ -302,7 +315,7 @@ def main():
                     pad_token_id = tokenizer.eos_token_id
                 generate_ids = model.generate(input_ids=batch['input_ids'],
                                               attention_mask=batch['attention_mask'],
-                                              max_new_tokens=args.max_ans_len,
+                                              max_new_tokens=int(max_ans_len),
                                               eos_token_id=tokenizer.eos_token_id,
                                               pad_token_id=pad_token_id,
                                               generation_config=generation_config,
@@ -330,6 +343,8 @@ def main():
     # modify left pad for training and inference
     inference_tasks = args.inference_tasks
     task_num = len(inference_tasks)
+    args.max_prompt_len = resolve_task_lengths(args.max_prompt_len, task_num, "max_prompt_len")
+    args.max_ans_len = resolve_task_lengths(args.max_ans_len, task_num, "max_ans_len")
     
     round = args.round
     
@@ -488,6 +503,8 @@ def main():
     all_results_dic = {}
     for inference_task_id in range(round + 1):  # evaluation for previous tasks in a single round
         inference_task = inference_tasks[inference_task_id]
+        task_max_prompt_len = args.max_prompt_len[inference_task_id]
+        task_max_ans_len = args.max_ans_len[inference_task_id]
         dataset_path = os.path.join(args.data_path, inference_task)
         print("\033[34m" + "Start inference Task {}, {}".format(inference_task_id, inference_task) + "\033[0m")
         # Prepare the data
@@ -507,8 +524,8 @@ def main():
                 tokenizer,
                 model=model,
                 padding="longest",
-                max_prompt_len=args.max_prompt_len,
-                max_ans_len=args.max_ans_len,
+                max_prompt_len=task_max_prompt_len,
+                max_ans_len=task_max_ans_len,
                 pad_to_multiple_of=8,
                 inference=True
             )
@@ -517,7 +534,7 @@ def main():
             args.demonstrations_num = 6
             demonstrations = get_random_demonstrations(
                 int(args.demonstrations_num), infer_dataset,
-                args.max_prompt_len - len(tokenizer(TASK_PROMT[inference_task] + Constrained_PROMPT)['input_ids']),
+                task_max_prompt_len - len(tokenizer(TASK_PROMT[inference_task] + Constrained_PROMPT)['input_ids']),
                 inference_task, tokenizer)
             # print_rank_0("demonstrations length:{}".format(len(demonstrations)), args.global_rank)
             print("demonstrations length:{}".format(len(demonstrations)))
@@ -527,8 +544,8 @@ def main():
                 tokenizer,
                 model=model,
                 padding="longest",
-                max_prompt_len=args.max_prompt_len,
-                max_ans_len=args.max_ans_len,
+                max_prompt_len=task_max_prompt_len,
+                max_ans_len=task_max_ans_len,
                 pad_to_multiple_of=8,
                 inference=True,
                 demonstrations=demonstrations,
@@ -562,7 +579,7 @@ def main():
         # Inference !
         # print_rank_0("***** Start inference *****", args.local_rank)
         # print red:
-        sources_sequences, predicted_sequences, ground_truths = prediction(model, infer_dataloader)
+        sources_sequences, predicted_sequences, ground_truths = prediction(model, infer_dataloader, task_max_ans_len)
         
         all_results_dic[inference_task] = {}
         all_results_dic[inference_task]["sources_sequences"] = str(sources_sequences)

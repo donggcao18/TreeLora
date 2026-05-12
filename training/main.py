@@ -76,6 +76,8 @@ class IndexedDataset(Dataset):
 def parse_args():
     def list_of_strings(arg):
         return arg.split(',')
+    def list_of_int_strings(arg):
+        return str(arg).split(',')
     parser = argparse.ArgumentParser(
         description=
         "Finetune a transformers model on a causal language modeling task")
@@ -120,14 +122,14 @@ def parse_args():
     )
     parser.add_argument(
         "--max_prompt_len",
-        type=int,
-        default=512,
+        type=list_of_int_strings,
+        default='320,320,256,130,512,256,256,256',
         help="The maximum sequence length.",
     )
     parser.add_argument(
         "--max_ans_len",
-        type=int,
-        default=512,
+        type=list_of_int_strings,
+        default='150,256,128,120,300,128,128,128',
         help="The maximum sequence length.",
     )
     parser.add_argument(
@@ -308,6 +310,18 @@ def parse_args():
 
 
     return args
+
+def resolve_task_lengths(values, task_count, name):
+    if isinstance(values, str):
+        values = values.split(',')
+    elif not isinstance(values, (list, tuple)):
+        values = [values]
+
+    if len(values) == 1:
+        return [int(values[0])] * task_count
+    if len(values) != task_count:
+        raise ValueError(f"{name} expects either 1 value or {task_count} values, got {len(values)}: {values}")
+    return [int(value) for value in values]
 
 def main():
     args = parse_args()
@@ -499,7 +513,12 @@ def main():
         Datasets = OLoRADatasetStandardName
     else:
         Datasets = args.dataset_name
-    for dataset in Datasets:
+    args.max_prompt_len = resolve_task_lengths(args.max_prompt_len, len(Datasets), "max_prompt_len")
+    args.max_ans_len = resolve_task_lengths(args.max_ans_len, len(Datasets), "max_ans_len")
+
+    for dataset_id, dataset in enumerate(Datasets):
+        task_max_prompt_len = args.max_prompt_len[dataset_id]
+        task_max_ans_len = args.max_ans_len[dataset_id]
         dataset_path = os.path.join(args.data_path,dataset)
         # Prepare the data
         train_dataset, eval_dataset, test_dataset = create_prompt_dataset(
@@ -529,8 +548,8 @@ def main():
         data_collator = DataCollator(
             tokenizer,
             padding="longest",
-            max_prompt_len=args.max_prompt_len,
-            max_ans_len=args.max_ans_len,
+            max_prompt_len=task_max_prompt_len,
+            max_ans_len=task_max_ans_len,
             pad_to_multiple_of=8,
             inference=False
         )
@@ -538,8 +557,8 @@ def main():
             tokenizer,
             model=model,
             padding="longest",
-            max_prompt_len=args.max_prompt_len,
-            max_ans_len=args.max_ans_len,
+            max_prompt_len=task_max_prompt_len,
+            max_ans_len=task_max_ans_len,
             pad_to_multiple_of=8,
             inference=True
         )

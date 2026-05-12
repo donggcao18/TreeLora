@@ -80,6 +80,13 @@ class CL_Base_Model:
     def _resolve_max_ans_len(self, task_id):
         max_ans_len = getattr(self.args, "max_ans_len", 256)
         if isinstance(max_ans_len, (list, tuple)):
+            if len(max_ans_len) == 1:
+                return int(max_ans_len[0])
+            return int(max_ans_len[task_id])
+        if isinstance(max_ans_len, str) and "," in max_ans_len:
+            max_ans_len = max_ans_len.split(",")
+            if len(max_ans_len) == 1:
+                return int(max_ans_len[0])
             return int(max_ans_len[task_id])
         return int(max_ans_len)
 
@@ -127,7 +134,8 @@ class CL_Base_Model:
         sample_indices = []
 
         if max_ans_len is None:
-            max_ans_len = getattr(self.args, "max_ans_len", 256)
+            max_ans_len = self._resolve_max_ans_len(0)
+        max_ans_len = int(max_ans_len)
 
         is_executable = getattr(self.args, "benchmark", "non-executable") != "non-executable"
         if is_executable:
