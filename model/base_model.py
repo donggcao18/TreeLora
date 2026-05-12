@@ -11,6 +11,7 @@ import json
 import os
 import time
 from evaluations import eval_ScienceQA, eval_MeetingBank, eval_PapyrusF, eval_CStance, eval_Py150, eval_FOMC, eval_NumGLUE_cm, eval_NumGLUE_ds # to be continued
+from evaluator.compute_metrics import compute_metrics, DATASET_TO_OUTPUT_LANG
 from transformers import GenerationConfig
 generation_config = GenerationConfig(
     temperature=0.1,
@@ -35,6 +36,7 @@ class CL_Base_Model:
         self.eval_task_list = eval_task_list
         self.test_task_list = test_task_list
         self.args = args
+        self.generation_config = generation_config
         
         
     def perplexity_evaluation(self, eval_dataloader, device):
@@ -58,6 +60,157 @@ class CL_Base_Model:
         except:
             pass
         return perplexity
+
+    def _task_eval_from_predictions(self, task, sources_sequences, predicted_sequences, ground_truths):
+        if task in ['CodeSearchNet', 'CoST', 'KodCode', 'RunBugRun', 'TheVault_Csharp']:
+            calc_codebleu = False
+        else:
+            calc_codebleu = True
+        return compute_metrics(
+            predicted_sequences,
+            ground_truths,
+            calc_codebleu=calc_codebleu,
+            language=DATASET_TO_OUTPUT_LANG.get(task, None)
+        )
+
+    def _generation_model(self):
+        if hasattr(self.model, "module"):
+            return self.model.module
+        return self.model
+
+    def _resolve_max_ans_len(self, task_id):
+        max_ans_len = getattr(self.args, "max_ans_len", 256)
+        if isinstance(max_ans_len, (list, tuple)):
+            return int(max_ans_len[task_id])
+        return int(max_ans_len)
+
+    def save_prediction_rows_jsonl(self, prediction_rows, output_path):
+        output_dir = os.path.dirname(output_path)
+        if output_dir:
+            os.makedirs(output_dir, exist_ok=True)
+        with open(output_path, "w", encoding="utf-8") as file:
+            for row in prediction_rows:
+                file.write(json.dumps(row, ensure_ascii=False) + "\n")
+
+    def task_generation_evaluation(self, task, test_dataloader, device, max_ans_len=None,
+                                   return_predictions=False, prediction_jsonl_path=None):
+        self.model.eval()
+        generation_model = self._generation_model()
+        predicted_sequences = []
+        sources_sequences = []
+        ground_truths = []
+
+        if max_ans_len is None:
+            max_ans_len = getattr(self.args, "max_ans_len", 256)
+
+        progress_bar = tqdm(total=len(test_dataloader), leave=True, disable=(self.args.global_rank != 0))
+        for step, batch in enumerate(test_dataloader):
+            sources_sequences += batch['sources']
+            if 'gts' in batch:
+                ground_truths += batch['gts']
+                del batch['gts']
+            elif 'labels' in batch:
+                label_tensor = batch['labels']
+                for row in label_tensor:
+                    valid_ids = row[row != -100].detach().cpu().tolist()
+                    ground_truths.append(
+                        self.tokenizer.decode(valid_ids, skip_special_tokens=True, clean_up_tokenization_spaces=False)
+                    )
+                del batch['labels']
+            else:
+                ground_truths += [''] * len(batch['sources'])
+
+            del batch['sources']
+            batch = to_device(batch, device)
+            prompt_len = batch['input_ids'].shape[1]
+
+            with torch.no_grad():
+                pad_token_id = self.tokenizer.pad_token_id
+                if pad_token_id is None:
+                    pad_token_id = self.tokenizer.eos_token_id
+
+                generate_ids = generation_model.generate(
+                    input_ids=batch['input_ids'],
+                    attention_mask=batch['attention_mask'],
+                    max_new_tokens=max_ans_len,
+                    eos_token_id=self.tokenizer.eos_token_id,
+                    pad_token_id=pad_token_id,
+                    generation_config=self.generation_config,
+                    use_cache=True,
+                )
+
+            sequences = self.tokenizer.batch_decode(
+                generate_ids[:, prompt_len:],
+                skip_special_tokens=True,
+                clean_up_tokenization_spaces=False
+            )
+            predicted_sequences += sequences
+
+            if self.args.global_rank == 0:
+                progress_bar.update(1)
+                description = f"Test step {step}"
+                progress_bar.set_description(description, refresh=False)
+        progress_bar.close()
+
+        metrics = self._task_eval_from_predictions(task, sources_sequences, predicted_sequences, ground_truths)
+        if return_predictions or prediction_jsonl_path is not None:
+            prediction_rows = [
+                {
+                    "source": source,
+                    "ground-truth": gt,
+                    "prediction": pred,
+                }
+                for source, gt, pred in zip(sources_sequences, ground_truths, predicted_sequences)
+            ]
+            if prediction_jsonl_path is not None and self.args.global_rank == 0:
+                self.save_prediction_rows_jsonl(prediction_rows, prediction_jsonl_path)
+        if return_predictions:
+            return metrics, prediction_rows
+        return metrics
+
+    def test_all_tasks_and_save_predictions(self):
+        if self.args.local_rank == -1:
+            device = torch.device("cuda")
+        else:
+            torch.cuda.set_device(self.args.local_rank)
+            device = torch.device("cuda", self.args.local_rank)
+
+        prediction_root = os.path.join(
+            self.args.output_dir or ".",
+            "predictions",
+            f"final-{self.__class__.__name__}"
+        )
+        if self.args.global_rank == 0:
+            os.makedirs(prediction_root, exist_ok=True)
+
+        final_metrics = {}
+        for task_idx, (task_name, test_dataloader) in enumerate(self.test_task_list.items()):
+            print_rank_0(
+                f"***** Final testing on task {task_name} after continual training *****",
+                self.args.global_rank,
+            )
+            test_result, prediction_rows = self.task_generation_evaluation(
+                task_name,
+                test_dataloader,
+                device,
+                max_ans_len=self._resolve_max_ans_len(task_idx),
+                return_predictions=True,
+            )
+            final_metrics[task_name] = test_result
+            print_rank_0(f"[final-test task={task_name}] result: {test_result}", self.args.global_rank)
+
+            if self.args.global_rank == 0:
+                safe_task_name = str(task_name).replace("/", "_").replace(":", "_")
+                prediction_file = os.path.join(prediction_root, f"{task_idx}_{safe_task_name}.json")
+                with open(prediction_file, "w", encoding="utf-8") as f:
+                    json.dump(prediction_rows, f, ensure_ascii=False, indent=2)
+                print_rank_0(f"Saved final-test predictions to {prediction_file}", self.args.global_rank)
+
+        if self.args.global_rank == 0:
+            metrics_file = os.path.join(prediction_root, "metrics_summary.json")
+            with open(metrics_file, "w", encoding="utf-8") as f:
+                json.dump(final_metrics, f, ensure_ascii=False, indent=2)
+            print_rank_0(f"Saved final-test metrics to {metrics_file}", self.args.global_rank)
 
 
     def train_one_task(self, task, i_task, epochs):
@@ -108,6 +261,7 @@ class CL_Base_Model:
         for i_task, task in enumerate(self.train_task_list):
             self.train_one_task(task, i_task, int(self.args.num_train_epochs[i_task]))
             self.save_model(i_task)
+        self.test_all_tasks_and_save_predictions()
 
     
     def save_model(self, round):

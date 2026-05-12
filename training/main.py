@@ -118,6 +118,29 @@ def parse_args():
         default=512,
         help="The maximum sequence length.",
     )
+    parser.add_argument(
+        "--num_train",
+        type=int,
+        default=-1,
+        help="Number of training examples per task to use. Use -1 for all examples.",
+    )
+    parser.add_argument(
+        "--num_eval",
+        type=int,
+        default=-1,
+        help="Number of eval examples per task to use. Use -1 for all examples.",
+    )
+    parser.add_argument(
+        "--num_test",
+        type=int,
+        default=-1,
+        help="Number of test examples per task to use. Use -1 for all examples.",
+    )
+    parser.add_argument(
+        "--eval_after_task",
+        action="store_true",
+        help="Run generation metrics on the validation split after each training epoch.",
+    )
 
     parser.add_argument(
         "--learning_rate",
@@ -446,7 +469,10 @@ def main():
             dataset_path,
             args.data_output_path,
             args.seed,
-            benchmark=args.benchmark
+            benchmark=args.benchmark,
+            num_train=args.num_train,
+            num_eval=args.num_eval,
+            num_test=args.num_test
         )
 
         # DataLoaders creation:
@@ -484,7 +510,7 @@ def main():
                                     sampler=train_sampler,
                                     batch_size=args.per_device_train_batch_size)
         eval_dataloader = DataLoader(eval_dataset,
-                                    collate_fn=data_collator,
+                                    collate_fn=inf_data_collator,
                                     sampler=eval_sampler,
                                     batch_size=args.per_device_eval_batch_size)
         test_dataloader = DataLoader(test_dataset,

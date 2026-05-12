@@ -39,10 +39,14 @@ task_metric = {
     "MultiRC": "accuracy",
     "IMDB"   : "accuracy",
     # Add new tasks here
-    "CONCODE"   : "bleu-1",
-    "CodeTrans" : "bleu-1",
-    "CodeSearchNet": "bleu-1",
     "BFP"      : "bleu-1",
+    "CONCODE"   : "bleu-1",
+    "CoST"      : "bleu-1",
+    "CodeSearchNet": "bleu-1",
+    "CodeTrans" : "bleu-1",
+    "KodCode"   : "bleu-1",
+    "RunBugRun" : "bleu-1",
+    "TheVault_Csharp": "bleu-1",
 }
 
 # MNLI,CB,WIC,COPA,QQP,BoolQA,RTE,IMDB,yelp,amazon,SST-2,dbpedia,agnews,MultiRC,yahoo

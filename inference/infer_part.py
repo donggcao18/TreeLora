@@ -150,6 +150,24 @@ def parse_args():
         default=4,
         help="Inference batch size.",
     )
+    parser.add_argument(
+        "--num_train",
+        type=int,
+        default=-1,
+        help="Number of training examples per task to load. Use -1 for all examples.",
+    )
+    parser.add_argument(
+        "--num_eval",
+        type=int,
+        default=-1,
+        help="Number of eval examples per task to load. Use -1 for all examples.",
+    )
+    parser.add_argument(
+        "--num_test",
+        type=int,
+        default=-1,
+        help="Number of test examples per task to evaluate. Use -1 for all examples.",
+    )
     #  add other inference params
     parser.add_argument(
         "--inference_tasks",
@@ -479,7 +497,10 @@ def main():
             args.data_output_path,
             args.seed,
             distributed=False,
-            benchmark=args.benchmark
+            benchmark=args.benchmark,
+            num_train=args.num_train,
+            num_eval=args.num_eval,
+            num_test=args.num_test
         )
         if args.CL_method != 'FIX':
             inf_data_collator = DataCollator(
