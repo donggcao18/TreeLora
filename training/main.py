@@ -17,7 +17,7 @@ import sys
 from tqdm import tqdm
 
 import torch
-from torch.utils.data import DataLoader, RandomSampler, SequentialSampler
+from torch.utils.data import DataLoader, RandomSampler, SequentialSampler, Dataset
 from torch.utils.data.distributed import DistributedSampler
 
 from transformers import (
@@ -59,7 +59,19 @@ from params import Method2Class, AllDatasetName, AllDatasetNameExecutable, OLoRA
 
 
 #  check support for OPT and llama
+class IndexedDataset(Dataset):
+    """Attach original row indices so distributed eval results can be reassembled."""
 
+    def __init__(self, dataset):
+        self.dataset = dataset
+
+    def __len__(self):
+        return len(self.dataset)
+
+    def __getitem__(self, idx):
+        item = dict(self.dataset[idx])
+        item["__index__"] = idx
+        return item
 
 def parse_args():
     def list_of_strings(arg):
@@ -500,7 +512,9 @@ def main():
             num_eval=args.num_eval,
             num_test=args.num_test
         )
-
+        eval_dataset = IndexedDataset(eval_dataset)
+        test_dataset = IndexedDataset(test_dataset)
+        
         # DataLoaders creation:
         if args.local_rank == -1:
             train_sampler = RandomSampler(train_dataset)

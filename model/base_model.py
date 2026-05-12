@@ -91,6 +91,32 @@ class CL_Base_Model:
             for row in prediction_rows:
                 file.write(json.dumps(row, ensure_ascii=False) + "\n")
 
+    def _ordered_unique_prediction_rows(self, prediction_rows):
+        if prediction_rows and all("__index__" in row for row in prediction_rows):
+            rows_by_index = {}
+            for row in prediction_rows:
+                index = int(row["__index__"])
+                if index not in rows_by_index:
+                    rows_by_index[index] = row
+            prediction_rows = [rows_by_index[index] for index in sorted(rows_by_index)]
+
+        return [
+            {key: value for key, value in row.items() if key != "__index__"}
+            for row in prediction_rows
+        ]
+    
+    def _gather_prediction_rows(self, prediction_rows):
+        if dist.is_available() and dist.is_initialized() and dist.get_world_size() > 1:
+            gathered_rows = [None for _ in range(dist.get_world_size())]
+            dist.all_gather_object(gathered_rows, prediction_rows)
+            prediction_rows = [
+                row
+                for rank_rows in gathered_rows
+                for row in rank_rows
+            ]
+
+        return self._ordered_unique_prediction_rows(prediction_rows)
+    
     def task_generation_evaluation(self, task, test_dataloader, device, max_ans_len=None,
                                    return_predictions=False, prediction_jsonl_path=None):
         self.model.eval()
@@ -98,6 +124,7 @@ class CL_Base_Model:
         predicted_sequences = []
         sources_sequences = []
         ground_truths = []
+        sample_indices = []
 
         if max_ans_len is None:
             max_ans_len = getattr(self.args, "max_ans_len", 256)
@@ -119,6 +146,10 @@ class CL_Base_Model:
 
         progress_bar = tqdm(total=len(test_dataloader), leave=True, disable=(self.args.global_rank != 0))
         for step, batch in enumerate(test_dataloader):
+            batch_indices = batch.pop('indices', None)
+            if batch_indices is not None:
+                sample_indices.extend(batch_indices.detach().cpu().tolist())
+
             sources_sequences += batch['sources']
             if 'gts' in batch:
                 ground_truths += batch['gts']
@@ -149,7 +180,7 @@ class CL_Base_Model:
                     max_new_tokens=max_ans_len,
                     eos_token_id=self.tokenizer.eos_token_id,
                     pad_token_id=pad_token_id,
-                    generation_config=self.generation_config,
+                    generation_config=generation_config,
                     use_cache=True,
                 )
 
@@ -173,17 +204,26 @@ class CL_Base_Model:
                 description = f"Test step {step}"
                 progress_bar.set_description(description, refresh=False)
         progress_bar.close()
+        prediction_rows = [
+            {
+                "source": source,
+                "ground-truth": gt,
+                "prediction": pred,
+            }
+            for source, gt, pred in zip(sources_sequences, ground_truths, predicted_sequences)
+        ]
+        if len(sample_indices) == len(prediction_rows):
+            for row, index in zip(prediction_rows, sample_indices):
+                row["__index__"] = index
+
+        prediction_rows = self._gather_prediction_rows(prediction_rows)
+        sources_sequences = [row["source"] for row in prediction_rows]
+        ground_truths = [row["ground-truth"] for row in prediction_rows]
+        predicted_sequences = [row["prediction"] for row in prediction_rows]
 
         metrics = {} if is_executable else self._task_eval_from_predictions(task, sources_sequences, predicted_sequences, ground_truths)
+
         if return_predictions or prediction_jsonl_path is not None:
-            prediction_rows = [
-                {
-                    "source": source,
-                    "ground-truth": gt,
-                    "prediction": pred,
-                }
-                for source, gt, pred in zip(sources_sequences, ground_truths, predicted_sequences)
-            ]
             if prediction_jsonl_path is not None and self.args.global_rank == 0:
                 self.save_prediction_rows_jsonl(prediction_rows, prediction_jsonl_path)
         if return_predictions:
