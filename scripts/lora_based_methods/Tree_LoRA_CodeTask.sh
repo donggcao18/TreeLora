@@ -28,8 +28,6 @@ deepspeed --include=localhost:$gpu_nodes training/main.py  \
     --per_device_train_batch_size 4 \
     --per_device_eval_batch_size 4 \
     --gradient_accumulation_steps 4 \
-    --max_prompt_len 512 \
-    --max_ans_len 320 \
     --num_train $num_train \
     --num_eval $num_eval \
     --num_test $num_test \
