@@ -1,14 +1,16 @@
 #!/bin/bash
 # Run Tree_LoRA on the executable benchmark.
+# This script uses 2 GPUs, 24GB VRAM each.
 # Allow override via environment variables.
-gpu_nodes="${GPU_NODES:-0}"
+gpu_nodes="${GPU_NODES:-0,1}"
 export CUDA_VISIBLE_DEVICES="$gpu_nodes"
+HF_MODEL_REPO_ID="ankhanhtran02/TreeLoRA_Qwen2.5-Coder-1.5B_executable"
 
 # Model selection
 model_name_or_path="Qwen/Qwen2.5-Coder-1.5B"
 model_name="Qwen2.5-Coder-1.5B"
 
-epochs=1,1,1,1,1,1,1,1
+epochs=1,1,1,1,1,1,1,1,1
 
 reg=0.5
 num_train=-1
@@ -24,9 +26,9 @@ deepspeed --include=localhost:$gpu_nodes training/main.py  \
     --dataset_name all \
     --benchmark executable \
     --model_name_or_path $model_name_or_path \
-    --per_device_train_batch_size 4 \
+    --per_device_train_batch_size 1 \
     --per_device_eval_batch_size 8 \
-    --gradient_accumulation_steps 4 \
+    --gradient_accumulation_steps 16 \
     --max_prompt_len 1024 \
     --max_ans_len 2048 \
     --learning_rate 1e-4 \
@@ -44,4 +46,11 @@ deepspeed --include=localhost:$gpu_nodes training/main.py  \
     --num_eval $num_eval \
     --num_test $num_test \
     --reg $reg \
-    --eval_after_task
+    --eval_after_task \
+    --do_sample 
+
+
+python upload_output_to_hf.py \
+  --output-dir "./outputs_LLM-CL/cl/$model_name/Tree_LoRA_executable_$now" \
+  --repo-id "$HF_MODEL_REPO_ID" \
+  --commit-message "Upload TreeLoRA executable outputs"
