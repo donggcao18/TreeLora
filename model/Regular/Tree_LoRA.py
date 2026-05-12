@@ -163,6 +163,28 @@ class Tree_LoRA(CL_Base_Model):
                     print_rank_0(f"Saved eval predictions to {pred_file}", self.args.global_rank)
                 self.model.train()
 
+        ### TEST ON ALL SEEN TASKS ###
+        for seen_idx, (test_task, test_dataset) in enumerate(list(self.test_task_list.items())[:task_id+1]):
+            print_rank_0(
+                f"***** Testing on current task {test_task} after training {task} on all epochs *****",
+                self.args.global_rank)
+            test_result, test_predictions = self.task_generation_evaluation(
+                test_task,
+                test_dataset,
+                self.device,
+                max_ans_len=self._resolve_max_ans_len(seen_idx),
+                return_predictions=True,
+            )
+            print_rank_0(f"[task={test_task}] post-train test result: {test_result}", self.args.global_rank)
+            if self.args.global_rank == 0 and self.args.output_dir is not None:
+                safe_task_name = str(test_task).replace("/", "_").replace(":", "_")
+                pred_dir = os.path.join(self.args.output_dir, "predictions", f"final-test-after-task-{task_id}")
+                os.makedirs(pred_dir, exist_ok=True)
+                pred_file = os.path.join(pred_dir, f"{safe_task_name}.json")
+                with open(pred_file, "w", encoding="utf-8") as f:
+                    json.dump({"metrics": test_result, "predictions": test_predictions}, f, ensure_ascii=False, indent=2)
+                print_rank_0(f"Saved eval predictions to {pred_file}", self.args.global_rank)
+
         
         #### SAVE ####
         if self.args.output_dir is not None:
