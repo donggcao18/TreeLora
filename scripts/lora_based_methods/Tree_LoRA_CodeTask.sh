@@ -15,9 +15,9 @@ codetask_tasks="CONCODE,CodeTrans,CodeSearchNet,BFP,KodCode,RunBugRun,TheVault_C
 epochs=3,3,3,3,3,3,3,3
 
 reg=0.5
-num_train=-1
+num_train=10
 num_eval=10
-num_test=-1
+num_test=10
 
 # Train:
 echo "Start training..."
