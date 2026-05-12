@@ -15,6 +15,8 @@ gpu_nodes="0,1,2,3"
 epochs=1,1,1,1
 #epochs=1,1,1,1
 #epochs=1,1,1,1
+max_prompt_len=320,320,256,130
+max_ans_len=150,256,128,120
 
 # Train:
 deepspeed --include=localhost:$gpu_nodes --master_port 25000 training/main.py  \
@@ -23,8 +25,8 @@ deepspeed --include=localhost:$gpu_nodes --master_port 25000 training/main.py  \
     --model_name_or_path ./PTM/$model_name \
     --per_device_train_batch_size 1 \
     --per_device_eval_batch_size 1 \
-    --max_prompt_len 1024 \
-    --max_ans_len 512 \
+    --max_prompt_len $max_prompt_len \
+    --max_ans_len $max_ans_len \
     --learning_rate 1e-5 \
     --weight_decay 0. \
     --num_train_epochs $epochs \
@@ -48,8 +50,8 @@ python inference/infer_multi_command.py  \
     --model_name_or_path ./PTM/$model_name \
     --inference_model_path ./outputs_LLM-CL/cl_O_order1/$model_name/base_$now \
     --inference_batch 1 \
-    --max_prompt_len 1024 \
-    --max_ans_len 512 \
+    --max_prompt_len $max_prompt_len \
+    --max_ans_len $max_ans_len \
     --seed 1234 \
     --CL_method base \
     --inference_output_path ./outputs_LLM-CL/cl_O_order1/$model_name/base_$now/predictions

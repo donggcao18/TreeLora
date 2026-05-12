@@ -77,7 +77,9 @@ class DataCollator:
         gts = []
         tokenized_sources = []
         actual_max_len = 0
-        limit_len = self.max_prompt_len + self.max_ans_len if not self.inference else self.max_prompt_len
+        max_prompt_len = int(self.max_prompt_len)
+        max_ans_len = int(self.max_ans_len)
+        limit_len = max_prompt_len + max_ans_len if not self.inference else max_prompt_len
         pad_id = self.tokenizer.pad_token_id
 
         for instance in batch:
@@ -90,13 +92,13 @@ class DataCollator:
                 formatted_prompt = f"input: {instruction}\noutput: "
                 tokenize_prompt = self.tokenize(
                     formatted_prompt,
-                    self.max_prompt_len,
+                    max_prompt_len,
                     add_bos_token=False,
                     add_eos_token=False,
                 )
                 tokenize_label = self.tokenize(
                     label,
-                    self.max_ans_len,
+                    max_ans_len,
                     add_bos_token=False,
                     add_eos_token=True,
                 )

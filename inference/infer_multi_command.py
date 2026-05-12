@@ -60,14 +60,14 @@ def parse_args():
     )
     parser.add_argument(
         "--max_prompt_len",
-        type=int,
+        type=str,
         default=512,
         help="The maximum sequence length.",
     )
     # inference params
     parser.add_argument(
         "--max_ans_len",
-        type=int,
+        type=str,
         default=256,
         help="The maximum answer length.",
     )
