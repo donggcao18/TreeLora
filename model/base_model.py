@@ -212,6 +212,51 @@ class CL_Base_Model:
                 json.dump(final_metrics, f, ensure_ascii=False, indent=2)
             print_rank_0(f"Saved final-test metrics to {metrics_file}", self.args.global_rank)
 
+    def test_seen_tasks_and_save_predictions(self, trained_task_id):
+        if self.args.local_rank == -1:
+            device = torch.device("cuda")
+        else:
+            torch.cuda.set_device(self.args.local_rank)
+            device = torch.device("cuda", self.args.local_rank)
+
+        task_items = list(self.test_task_list.items())[:trained_task_id + 1]
+        prediction_root = os.path.join(
+            self.args.output_dir or ".",
+            "predictions",
+            f"after-task{trained_task_id}"
+        )
+        if self.args.global_rank == 0:
+            os.makedirs(prediction_root, exist_ok=True)
+
+        seen_metrics = {}
+        for task_idx, (task_name, test_dataloader) in enumerate(task_items):
+            print_rank_0(
+                f"***** Testing seen task {task_name} after training task {trained_task_id} *****",
+                self.args.global_rank,
+            )
+            test_result, prediction_rows = self.task_generation_evaluation(
+                task_name,
+                test_dataloader,
+                device,
+                max_ans_len=self._resolve_max_ans_len(task_idx),
+                return_predictions=True,
+            )
+            seen_metrics[task_name] = test_result
+            print_rank_0(f"[after-task={trained_task_id} test-task={task_name}] result: {test_result}", self.args.global_rank)
+
+            if self.args.global_rank == 0:
+                safe_task_name = str(task_name).replace("/", "_").replace(":", "_")
+                prediction_file = os.path.join(prediction_root, f"{task_idx}_{safe_task_name}.json")
+                with open(prediction_file, "w", encoding="utf-8") as f:
+                    json.dump({"metrics": test_result, "predictions": prediction_rows}, f, ensure_ascii=False, indent=2)
+                print_rank_0(f"Saved seen-task test predictions to {prediction_file}", self.args.global_rank)
+
+        if self.args.global_rank == 0:
+            metrics_file = os.path.join(prediction_root, "metrics_summary.json")
+            with open(metrics_file, "w", encoding="utf-8") as f:
+                json.dump(seen_metrics, f, ensure_ascii=False, indent=2)
+            print_rank_0(f"Saved seen-task test metrics to {metrics_file}", self.args.global_rank)
+
 
     def train_one_task(self, task, i_task, epochs):
         if self.args.local_rank == -1:
@@ -261,7 +306,6 @@ class CL_Base_Model:
         for i_task, task in enumerate(self.train_task_list):
             self.train_one_task(task, i_task, int(self.args.num_train_epochs[i_task]))
             self.save_model(i_task)
-        self.test_all_tasks_and_save_predictions()
 
     
     def save_model(self, round):

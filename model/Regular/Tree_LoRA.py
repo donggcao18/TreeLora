@@ -180,6 +180,10 @@ class Tree_LoRA(CL_Base_Model):
             #     # save the tree using pickle:
             #     with open(os.path.join(peft_model_id, 'treelora_task_{}.pkl'.format(task_id)), 'wb') as f:
             #         pickle.dump(self.kd_lora_tree, f)
+
+        if getattr(self.args, "eval_after_task", False):
+            self.test_seen_tasks_and_save_predictions(task_id)
+            self.model.train()
         
         if self.args.reg > 0:
             # after each task:
