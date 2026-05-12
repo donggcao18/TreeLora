@@ -47,6 +47,7 @@ torchvision==0.19.1
 ```bash
 # Install dependencies
 pip install -r requirements.txt
+pip install torch==2.7.0 torchvision==0.22.0 torchaudio==2.7.0 --index-url https://download.pytorch.org/whl/cu128
 pip install flash-attn==2.6.3 --no-build-isolation
 ```
 
