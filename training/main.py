@@ -70,7 +70,7 @@ class IndexedDataset(Dataset):
 
     def __getitem__(self, idx):
         item = dict(self.dataset[idx])
-        item["__index__"] = idx
+        item["index"] = idx
         return item
 
 def parse_args():

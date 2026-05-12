@@ -87,7 +87,9 @@ class DataCollator:
             sources.append(instruction)
             gts.append(label)
             if "index" in instance:
-                indices.append(instance["index"])
+                indices.append(int(instance["index"]))
+            elif "__index__" in instance:
+                indices.append(int(instance["__index__"]))
 
             if not self.inference:
                 formatted_prompt = f"input: {instruction}\noutput: "

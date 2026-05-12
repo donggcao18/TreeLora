@@ -115,7 +115,11 @@ class CL_Base_Model:
                 for row in rank_rows
             ]
 
-        return self._ordered_unique_prediction_rows(prediction_rows)
+        if not prediction_rows:
+            return prediction_rows
+
+        if all("__index__" in row for row in prediction_rows):
+            return self._ordered_unique_prediction_rows(prediction_rows)
     
     def task_generation_evaluation(self, task, test_dataloader, device, max_ans_len=None,
                                    return_predictions=False, prediction_jsonl_path=None):
