@@ -41,12 +41,14 @@ from utils.ds_utils import get_train_ds_config
 from utils.module.lora import convert_linear_layer_to_lora, convert_lora_to_linear_layer, only_optimize_lora_parameters
 from utils.model.model_utils import create_hf_model
 
-# add flash attention
-from utils.flash_attention.llama_flash_att import replace_llama_attn_with_flash_attn
-from utils.flash_attention.bloom_flash_att import replace_bloom_attn_with_flash_attn
-
-replace_llama_attn_with_flash_attn()
-replace_bloom_attn_with_flash_attn()
+# # add flash attention
+try:
+    from utils.flash_attention.llama_flash_att import replace_llama_attn_with_flash_attn
+    from utils.flash_attention.bloom_flash_att import replace_bloom_attn_with_flash_attn
+    replace_llama_attn_with_flash_attn()
+    replace_bloom_attn_with_flash_attn()
+except Exception as exc:
+    print(f"Flash attention unavailable, skipping. Reason: {exc}")
 
 from params import Method2Class, AllDatasetName
 

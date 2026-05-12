@@ -61,11 +61,13 @@ from model.Dynamic_network.DualPrompt import convert_DualPrompt_model
 
 
 # add flash attention
-from utils.flash_attention.llama_flash_att import replace_llama_attn_with_flash_attn
-from utils.flash_attention.bloom_flash_att import replace_bloom_attn_with_flash_attn
-
-replace_llama_attn_with_flash_attn()
-replace_bloom_attn_with_flash_attn()
+try:
+    from utils.flash_attention.llama_flash_att import replace_llama_attn_with_flash_attn
+    from utils.flash_attention.bloom_flash_att import replace_bloom_attn_with_flash_attn
+    replace_llama_attn_with_flash_attn()
+    replace_bloom_attn_with_flash_attn()
+except Exception as exc:
+    print(f"Flash attention unavailable, skipping. Reason: {exc}")
 
 def parse_args():
     def list_of_strings(arg):
