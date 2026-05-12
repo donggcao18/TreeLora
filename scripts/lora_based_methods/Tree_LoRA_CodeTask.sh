@@ -15,9 +15,9 @@ codetask_tasks="CONCODE,CodeTrans,CodeSearchNet,BFP,KodCode,RunBugRun,TheVault_C
 epochs=3,3,3,3,3,3,3,3
 
 reg=0.5
-num_train=16
-num_eval=16
-num_test=16
+num_train=-1
+num_eval=8
+num_test=-1
 
 # Train:
 echo "Start training..."
@@ -25,9 +25,9 @@ deepspeed --include=localhost:$gpu_nodes training/main.py  \
     --data_path CODETASK_HF \
     --dataset_name $codetask_tasks \
     --model_name_or_path $model_name_or_path \
-    --per_device_train_batch_size 8 \
-    --per_device_eval_batch_size 8 \
-    --gradient_accumulation_steps 4 \
+    --per_device_train_batch_size 4 \
+    --per_device_eval_batch_size 4 \
+    --gradient_accumulation_steps 8 \
     --num_train $num_train \
     --num_eval $num_eval \
     --num_test $num_test \
