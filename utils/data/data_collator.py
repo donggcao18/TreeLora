@@ -75,6 +75,7 @@ class DataCollator:
     def decoder_call(self, batch, return_tensors):
         sources = []
         gts = []
+        indices = []
         tokenized_sources = []
         actual_max_len = 0
         limit_len = self.max_prompt_len + self.max_ans_len if not self.inference else self.max_prompt_len
@@ -85,6 +86,8 @@ class DataCollator:
             label = instance["answer"]
             sources.append(instruction)
             gts.append(label)
+            if "index" in instance:
+                indices.append(instance["index"])
 
             if not self.inference:
                 formatted_prompt = f"input: {instruction}\noutput: "
@@ -170,5 +173,7 @@ class DataCollator:
         model_inputs["sources"] = sources
         if self.inference:
             model_inputs["gts"] = gts
+        if indices:
+            model_inputs["indices"] = torch.tensor(indices)
 
         return model_inputs

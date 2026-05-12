@@ -78,6 +78,7 @@ class Tree_LoRA(CL_Base_Model):
                     self.kd_lora_tree.step()
                     
                 del batch['sources']
+                batch.pop('index', None)
                 batch = to_device(batch, self.device)
                 outputs = self.model(**batch, use_cache=False)
                 loss = outputs.loss
