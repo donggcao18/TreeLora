@@ -256,7 +256,7 @@ def parse_args():
                         type=int,
                         help='dimension of prompt key space in SAPT')
 
-    parser.add_argument('--temperature',
+    parser.add_argument('--sapt_temperature',
                         default=1.0,
                         type=float,
                         help='temperature for attention softmax in SAPT')
@@ -265,6 +265,32 @@ def parse_args():
                         default=0.5,
                         type=float,
                         help='weight for KL loss in SAPT ARM module')
+    # Generation configuration parameters
+    parser.add_argument(
+        "--temperature",
+        type=float,
+        default=0.2,
+        help="Temperature for generation.",
+    )
+    parser.add_argument('--do_sample',
+                        action='store_true',
+                        help='Whether to use sampling for generation.')
+    parser.add_argument('--top_p',
+                        type=float,
+                        default=0.95,
+                        help='Top-p for generation.')
+    parser.add_argument('--top_k',
+                        type=int,
+                        default=0,
+                        help='Top-k for generation (0 disables top-k sampling).')
+    parser.add_argument('--repetition_penalty',
+                        type=float,
+                        default=1.0,
+                        help='Repetition penalty for generation.')
+    parser.add_argument('--num_return_sequences',
+                        type=int,
+                        default=5,
+                        help='Number of generated sequences per prompt.')
     parser = deepspeed.add_config_arguments(parser)
     args = parser.parse_args()
 
