@@ -40,6 +40,33 @@ class Tree_LoRA(CL_Base_Model):
         num_task = len(self.train_task_list)
         args.num_tasks = num_task
         self.kd_lora_tree = KD_LoRA_Tree(args)
+        self._load_kd_lora_tree_if_available()
+
+    def _load_kd_lora_tree_if_available(self):
+        checkpoint_dir = getattr(self.args, "resume_from_checkpoint", None)
+        if checkpoint_dir is None:
+            return
+
+        candidates = [
+            os.path.join(checkpoint_dir, "treelora_state.pkl"),
+            os.path.join(checkpoint_dir, "treelora_task_{}.pkl".format(int(getattr(self.args, "resume_from_task", 1)) - 1)),
+        ]
+        for tree_path in candidates:
+            if os.path.exists(tree_path):
+                with open(tree_path, "rb") as f:
+                    self.kd_lora_tree = pickle.load(f)
+                self.kd_lora_tree.args = self.args
+                if len(self.kd_lora_tree.all_accumulate_grads) < self.args.num_tasks:
+                    self.kd_lora_tree.all_accumulate_grads.extend(
+                        [None] * (self.args.num_tasks - len(self.kd_lora_tree.all_accumulate_grads))
+                    )
+                print_rank_0(f"Loaded Tree_LoRA KD-tree state from {tree_path}", self.args.global_rank)
+                return
+
+        print_rank_0(
+            f"No Tree_LoRA KD-tree state found in {checkpoint_dir}; tree memory will rebuild from newly trained tasks.",
+            self.args.global_rank
+        )
 
     def _resolve_max_ans_len(self, task_id):
         max_ans_len = getattr(self.args, "max_ans_len", 256)
@@ -109,7 +136,10 @@ class Tree_LoRA(CL_Base_Model):
                     
                     self.tiktok.tok("Split_Grad_@Task{} Epoch{}".format(task_id, epoch))
                     
-                    if task_id > 0:
+                    has_previous_grads = any(
+                        grad is not None for grad in self.kd_lora_tree.all_accumulate_grads[:task_id]
+                    )
+                    if task_id > 0 and has_previous_grads:
                         self.tiktok.tik()
                         prev_id_matrix = self.kd_lora_tree.tree_search(task_id, device=self.device)
                         self.tiktok.tok("Calculate_Tree_Search_@Task{} Epoch{}".format(task_id, epoch))
@@ -195,6 +225,19 @@ class Tree_LoRA(CL_Base_Model):
         if self.args.reg > 0:
             # after each task:
             self.kd_lora_tree.end_task(task_id=task_id)
+            if self.args.global_rank == 0 and self.args.output_dir is not None:
+                with open(os.path.join(peft_model_id, 'treelora_state.pkl'), 'wb') as f:
+                    pickle.dump(self.kd_lora_tree, f)
+                with open(os.path.join(peft_model_id, 'treelora_task_{}.pkl'.format(task_id)), 'wb') as f:
+                    pickle.dump(self.kd_lora_tree, f)
+
+    def train_continual(self):
+        start_task = int(getattr(self.args, "resume_from_task", 0) or 0)
+        for task_id, task in enumerate(self.train_task_list):
+            if task_id < start_task:
+                print_rank_0(f"Skipping task {task_id} ({task}) because training is resuming from task {start_task}", self.args.global_rank)
+                continue
+            self.train_one_task(task, task_id, int(self.args.num_train_epochs[task_id]))
 
     # def save_model(self, i_task):
     #     pass

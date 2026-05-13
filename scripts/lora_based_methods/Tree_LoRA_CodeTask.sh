@@ -17,7 +17,7 @@ epochs=3,3,3,3,3,3,3,3
 reg=0.5
 num_train=-1
 num_eval=8
-num_test=-1
+num_test=4
 
 # Train:
 echo "Start training..."
@@ -43,4 +43,6 @@ deepspeed --include=localhost:$gpu_nodes training/main.py  \
     --CL_method Tree_LoRA \
     --eval_after_task \
     --output_dir ./outputs_LLM-CL/cl/$model_name/Tree_LoRA_$now \
-    --reg $reg
+    --reg $reg \
+    --resume_from_checkpoint ./outputs_LLM-CL/cl/Tree_LoRA_0512_122659 \
+    --resume_from_task 6

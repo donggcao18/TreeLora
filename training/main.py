@@ -236,6 +236,14 @@ def parse_args():
                         default=-1,
                         type=int,
                         help='max depth of lora layers, -1 means no limit')
+    parser.add_argument('--resume_from_checkpoint',
+                        default=None,
+                        type=str,
+                        help='Path to a saved Tree_LoRA adapter checkpoint to resume training from.')
+    parser.add_argument('--resume_from_task',
+                        default=None,
+                        type=int,
+                        help='Task index to start training from when resuming. If omitted, infer from checkpoint folder name when possible.')
     parser.add_argument('--target_percentage',
                         default=20,
                         type=int,
@@ -376,17 +384,45 @@ def main():
                 param.requires_grad = False
     
     if args.CL_method == "Tree_LoRA":
-        from utils.my_peft import get_peft_model, PromptTuningInit, PromptTuningConfig, LoraConfig, TaskType
+        from utils.my_peft import get_peft_model, PeftModel, PromptTuningInit, PromptTuningConfig, LoraConfig, TaskType
         
-        peft_config = LoraConfig(
-            task_type=TaskType.CAUSAL_LM, r=8, lora_alpha=32, lora_dropout=0.1
-        )
-        model = get_peft_model(model, peft_config, depth=args.lora_depth)
+        if args.resume_from_checkpoint is not None:
+            if (
+                not os.path.exists(os.path.join(args.resume_from_checkpoint, "adapter_config.json"))
+                and os.path.isdir(args.resume_from_checkpoint)
+            ):
+                candidate = None
+                if args.resume_from_task is not None:
+                    candidate = os.path.join(args.resume_from_checkpoint, str(args.resume_from_task - 1))
+                else:
+                    checkpoint_ids = [
+                        int(name) for name in os.listdir(args.resume_from_checkpoint)
+                        if name.isdigit() and os.path.exists(os.path.join(args.resume_from_checkpoint, name, "adapter_config.json"))
+                    ]
+                    if checkpoint_ids:
+                        candidate = os.path.join(args.resume_from_checkpoint, str(max(checkpoint_ids)))
+                if candidate is not None and os.path.exists(os.path.join(candidate, "adapter_config.json")):
+                    args.resume_from_checkpoint = candidate
+
+            print_rank_0(f"Loading Tree_LoRA checkpoint from {args.resume_from_checkpoint}", args.global_rank)
+            model = PeftModel.from_pretrained(model, args.resume_from_checkpoint, is_trainable=True)
+            if args.resume_from_task is None:
+                checkpoint_name = os.path.basename(os.path.normpath(args.resume_from_checkpoint))
+                args.resume_from_task = int(checkpoint_name) + 1 if checkpoint_name.isdigit() else 0
+        else:
+            peft_config = LoraConfig(
+                task_type=TaskType.CAUSAL_LM, r=8, lora_alpha=32, lora_dropout=0.1
+            )
+            model = get_peft_model(model, peft_config, depth=args.lora_depth)
+            if args.resume_from_task is None:
+                args.resume_from_task = 0
+
         for name, param in model.named_parameters():
             if name.find("loranew_") != -1:
                 param.requires_grad = True
             elif name.find("lora_") != -1:
                 param.requires_grad = False
+        print_rank_0(f"Tree_LoRA training will start from task index {args.resume_from_task}", args.global_rank)
     
     if args.CL_method == "OGD":
         from utils.my_peft import get_peft_model, PromptTuningInit, PromptTuningConfig, LoraConfig, TaskType
