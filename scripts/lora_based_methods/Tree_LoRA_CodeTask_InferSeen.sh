@@ -20,7 +20,7 @@ CUDA_VISIBLE_DEVICES=$gpu_nodes python inference/infer_treelora_seen_tasks.py \
     --inference_tasks $codetask_tasks \
     --max_prompt_len $max_prompt_len \
     --max_ans_len $max_ans_len \
-    --per_device_eval_batch_size 32 \
+    --per_device_eval_batch_size 128 \
     --num_test -1 \
     --seed 1234 \
     --output_dir "$checkpoint_path/seen_task_eval"
