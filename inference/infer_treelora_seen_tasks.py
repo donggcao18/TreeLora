@@ -27,7 +27,8 @@ from evaluator.compute_metrics import DATASET_TO_OUTPUT_LANG, compute_metrics
 from utils.data.data_collator import DataCollator
 from utils.data.data_utils import create_prompt_dataset
 from utils.model.model_utils import create_hf_model
-from utils.my_peft import PeftModel
+from utils.my_peft import LoraConfig, TaskType, get_peft_model
+from utils.my_peft.utils import set_peft_model_state_dict
 from utils.utils import load_hf_tokenizer, set_random_seed, to_device
 
 
@@ -110,12 +111,51 @@ def load_tokenizer_for_checkpoint(checkpoint: str, args):
     return tokenizer
 
 
+def infer_saved_lora_ranks(adapter_state_dict: Dict, fallback_r: int, fallback_r_sum: int):
+    saved_r = fallback_r
+    saved_r_sum = fallback_r_sum
+
+    for key, value in adapter_state_dict.items():
+        if "loranew_A" in key:
+            saved_r = int(value.shape[0])
+            break
+        if "loranew_B" in key:
+            saved_r = int(value.shape[1])
+            break
+
+    for key, value in adapter_state_dict.items():
+        if "lora_A" in key and "loranew_A" not in key:
+            saved_r_sum = int(value.shape[0])
+            break
+        if "lora_B" in key and "loranew_B" not in key:
+            saved_r_sum = int(value.shape[1])
+            break
+
+    return saved_r, saved_r_sum
+
+
 def load_treelora_model(checkpoint: str, tokenizer, args, dtype, device):
     adapter_config = os.path.join(checkpoint, "adapter_config.json")
     adapter_model = os.path.join(checkpoint, "adapter_model.bin")
     if not os.path.isfile(adapter_config) or not os.path.isfile(adapter_model):
         raise FileNotFoundError(
             f"Tree_LoRA checkpoint must contain adapter_config.json and adapter_model.bin: {checkpoint}"
+        )
+
+    with open(adapter_config, "r", encoding="utf-8") as file:
+        saved_config = json.load(file)
+    adapter_state_dict = torch.load(adapter_model, map_location="cpu")
+    saved_r, saved_r_sum = infer_saved_lora_ranks(
+        adapter_state_dict,
+        fallback_r=int(saved_config.get("r", 8)),
+        fallback_r_sum=int(saved_config.get("r_sum", 0)),
+    )
+
+    if int(saved_config.get("r_sum", 0)) != saved_r_sum:
+        print(
+            f"[INFO] adapter_config.json has r_sum={saved_config.get('r_sum')}, "
+            f"but adapter_model.bin stores lora rank-sum {saved_r_sum}. "
+            "Using tensor shape from adapter_model.bin for inference."
         )
 
     print(f"Loading base model: {args.model_name_or_path}")
@@ -126,8 +166,22 @@ def load_treelora_model(checkpoint: str, tokenizer, args, dtype, device):
         ds_config=None,
     )
 
-    print(f"Loading Tree_LoRA adapter: {checkpoint}")
-    model = PeftModel.from_pretrained(model, checkpoint)
+    peft_config = LoraConfig(
+        task_type=TaskType.CAUSAL_LM,
+        r=saved_r,
+        lora_alpha=int(saved_config.get("lora_alpha", 32)),
+        lora_dropout=float(saved_config.get("lora_dropout", 0.0)),
+        target_modules=saved_config.get("target_modules", None),
+        fan_in_fan_out=bool(saved_config.get("fan_in_fan_out", False)),
+        bias=saved_config.get("bias", "none"),
+        r_sum=saved_r_sum,
+        save_loranew=bool(saved_config.get("save_loranew", False)),
+        inference_mode=True,
+    )
+
+    print(f"Loading Tree_LoRA adapter tensors: {checkpoint} (r={saved_r}, r_sum={saved_r_sum})")
+    model = get_peft_model(model, peft_config, depth=args.lora_depth)
+    set_peft_model_state_dict(model, adapter_state_dict, adapter_name="default")
     for _, param in model.named_parameters():
         param.requires_grad = False
 
@@ -351,6 +405,7 @@ def parse_args():
     parser.add_argument("--seed", type=int, default=1234)
     parser.add_argument("--output_dir", default=None)
     parser.add_argument("--dtype", choices=["auto", "fp32", "fp16", "bf16"], default="auto")
+    parser.add_argument("--lora_depth", type=int, default=-1)
     parser.add_argument("--do_sample", action="store_true")
     parser.add_argument("--temperature", type=float, default=0.1)
     args = parser.parse_args()
